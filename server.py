@@ -678,6 +678,28 @@ def api_orders(computer_id):
     } for o in orders])
 
 
+@app.route('/api/reports')
+def api_reports():
+    if not current_user.is_authenticated or current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    from datetime import date, timedelta
+    range_val = request.args.get('range', 'today')
+    today = date.today()
+    if range_val == 'week':
+        start = today - timedelta(days=7)
+    elif range_val == 'month':
+        start = today - timedelta(days=30)
+    else:
+        start = today
+    stats = get_daily_stats(today)
+    return jsonify({
+        'range': range_val,
+        'orders': stats.get('orders', 0),
+        'pages': stats.get('pages', 0),
+        'revenue': stats.get('revenue', 0),
+    })
+
+
 @app.route('/api/workers')
 def api_workers():
     if not current_user.is_authenticated or current_user.role != 'manager':
