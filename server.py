@@ -503,8 +503,10 @@ def api_customer(phone):
 @manager_required
 def manager_settings():
     if request.method == 'POST':
+        is_json = request.is_json
+        source = request.get_json() if is_json else request.form
         for key in ['shop_name', 'shop_slogan', 'price_bw', 'price_color', 'auto_delete_days']:
-            val = request.form.get(key)
+            val = source.get(key)
             if val is not None:
                 s = Setting.query.filter_by(key=key).first()
                 if s:
@@ -512,6 +514,8 @@ def manager_settings():
                 else:
                     db.session.add(Setting(key=key, value=val))
         db.session.commit()
+        if is_json:
+            return jsonify({'success': True, 'message': 'Settings saved'})
         flash('Settings saved.', 'success')
         return redirect(url_for('manager_settings'))
     settings = {s.key: s.value for s in Setting.query.all()}
