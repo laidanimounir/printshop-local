@@ -47,6 +47,9 @@
             <div>
               <div class="order-number">#{{ order.order_number }}</div>
               <div style="font-size:0.85rem;color:var(--text-light);">{{ order.customer_phone }}</div>
+              {% if order.customer_phone %}
+              <div style="font-size:0.75rem;color:var(--accent);" class="customer-badge" data-phone="{{ order.customer_phone }}">👤 ...</div>
+              {% endif %}
             </div>
             <div style="text-align:left;">
               {% if order.is_duplex %}<span class="badge badge-printing" style="background:var(--accent);color:var(--dark);">⚡ وجهين</span>{% endif %}
@@ -419,6 +422,21 @@
       const now = new Date();
       document.getElementById('clock').textContent = now.toLocaleTimeString('ar-DZ');
     }
+    document.querySelectorAll('.customer-badge').forEach(el => {
+      const phone = el.dataset.phone;
+      if (phone) {
+        fetch(`/api/customer/${phone}`).then(r=>r.json()).then(d => {
+          if (d.exists === false) { el.textContent = '👤 زبون جديد'; }
+          else {
+            let txt = `👤 ${d.total_orders} طلب`;
+            if (d.is_vip) txt = '⭐ VIP ' + txt;
+            if (d.discount_percent > 0) txt += ` (خصم ${d.discount_percent}%)`;
+            el.textContent = txt;
+          }
+        });
+      }
+    });
+
     setInterval(updateClock, 1000);
     updateClock();
   </script>

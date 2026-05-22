@@ -39,11 +39,16 @@
         <div class="stat-card"><div class="stat-value" id="statWorkers">-</div><div class="stat-label">العمال النشطون</div></div>
       </div>
 
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+      <div class="stats-grid" id="queueGrid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
         {% for pc_id, info in stats.items() %}
-        <div class="stat-card" style="padding:12px;">
-          <div style="font-weight:700;color:var(--primary);">{{ info.name }}</div>
-          <div style="font-size:0.85rem;color:var(--text-light);">{{ info.new_count }} جديد</div>
+        <div class="stat-card" style="padding:12px;" data-pc="{{ pc_id }}">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;color:var(--primary);">{{ info.name }}</div>
+            <div style="font-size:0.85rem;color:var(--text-light);" class="queue-load-text">{{ info.new_count }}</div>
+          </div>
+          <div style="margin-top:8px;height:8px;background:var(--gray);border-radius:4px;overflow:hidden;">
+            <div class="queue-load-bar" style="height:100%;width:{{ (info.new_count / 10) * 100 }}%;background:var(--success);border-radius:4px;transition:all 0.3s;"></div>
+          </div>
         </div>
         {% endfor %}
       </div>

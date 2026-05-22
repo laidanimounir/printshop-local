@@ -269,6 +269,9 @@ def worker_payment(order_id):
     order.worker_id = current_user.id
     order.updated_at = datetime.utcnow()
     db.session.commit()
+    from database import get_or_create_customer, update_customer_stats
+    cust = get_or_create_customer(order.customer_phone)
+    update_customer_stats(order.customer_phone)
     return jsonify({'success': True, 'change': order.change_given})
 
 
@@ -426,6 +429,75 @@ def manager_reports_export():
                      mimetype='application/pdf')
 
 
+@app.route('/manager/customers')
+@login_required
+@manager_required
+def manager_customers():
+    from database import Customer, get_top_customers
+    customers = Customer.query.order_by(Customer.last_visit.desc()).all()
+    top = get_top_customers(10)
+    shop_name = get_setting('shop_name', config.SHOP_NAME)
+    return render_template('manager_customers.html', customers=customers,
+                           top=top, shop_name=shop_name)
+
+
+@app.route('/manager/customers/<phone>')
+@login_required
+@manager_required
+def manager_customer_detail(phone):
+    from database import Customer
+    customer = Customer.query.filter_by(phone=phone).first_or_404()
+    orders = Order.query.filter_by(customer_phone=phone).order_by(Order.created_at.desc()).all()
+    shop_name = get_setting('shop_name', config.SHOP_NAME)
+    return render_template('manager_customer_detail.html',
+                           customer=customer, orders=orders, shop_name=shop_name)
+
+
+@app.route('/manager/customers/discount', methods=['POST'])
+@login_required
+@manager_required
+def manager_customer_discount():
+    from database import Customer
+    phone = request.form.get('phone')
+    discount = int(request.form.get('discount', 0))
+    customer = Customer.query.filter_by(phone=phone).first()
+    if customer:
+        customer.discount_percent = discount
+        db.session.commit()
+        return jsonify({'success': True})
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/manager/customers/vip', methods=['POST'])
+@login_required
+@manager_required
+def manager_customer_vip():
+    from database import Customer
+    data = request.get_json()
+    customer = Customer.query.filter_by(phone=data.get('phone')).first()
+    if customer:
+        customer.is_vip = not customer.is_vip
+        db.session.commit()
+        return jsonify({'success': True, 'is_vip': customer.is_vip})
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/customer/<phone>')
+def api_customer(phone):
+    from database import Customer
+    customer = Customer.query.filter_by(phone=phone).first()
+    if customer:
+        return jsonify({
+            'phone': customer.phone,
+            'name': customer.name,
+            'total_orders': customer.total_orders,
+            'total_spent': customer.total_spent,
+            'discount_percent': customer.discount_percent,
+            'is_vip': customer.is_vip
+        })
+    return jsonify({'exists': False})
+
+
 @app.route('/manager/settings', methods=['GET', 'POST'])
 @login_required
 @manager_required
@@ -517,6 +589,50 @@ def manager_qr_regenerate(pc_id):
     from qr_generator import generate_qr_for_computer
     generate_qr_for_computer(pc_id, config.COMPUTERS[pc_id])
     return jsonify({'success': True})
+
+
+# ====== Queue Management ======
+
+@app.route('/api/queue/status')
+def api_queue_status():
+    from queue_manager import get_station_load, get_overloaded_stations
+    loads = get_station_load()
+    overloaded = get_overloaded_stations(5)
+    least = None
+    if overloaded:
+        from queue_manager import get_least_busy_station
+        least = get_least_busy_station()
+    result = {}
+    for pc_id in config.COMPUTERS:
+        result[pc_id] = {
+            'name': config.COMPUTERS[pc_id]['name'],
+            'load': loads.get(pc_id, 0),
+            'overloaded': pc_id in overloaded
+        }
+    return jsonify({'stations': result, 'least_busy': least})
+
+
+@app.route('/api/queue/redirect/<int:order_id>/<target_pc>', methods=['POST'])
+@login_required
+@worker_required
+def api_queue_redirect(order_id, target_pc):
+    if target_pc not in config.COMPUTERS:
+        return jsonify({'error': 'Invalid target'}), 400
+    order = Order.query.get_or_404(order_id)
+    if order.computer_id != current_user.computer_id:
+        return jsonify({'error': 'Not your order'}), 403
+    transfer = Transfer(
+        order_id=order.id,
+        from_computer=order.computer_id,
+        to_computer=target_pc,
+        reason='Auto-balance'
+    )
+    order.computer_id = target_pc
+    order.status = 'transferred'
+    order.updated_at = datetime.utcnow()
+    db.session.add(transfer)
+    db.session.commit()
+    return jsonify({'success': True, 'new_computer': target_pc})
 
 
 # ====== API Routes ======
@@ -615,6 +731,49 @@ def windows_captive():
 @app.route('/success.html')
 def generic_captive():
     return redirect(url_for('upload_page', computer_id='PC1'))
+
+
+# ====== Backups ======
+
+@app.route('/manager/backups')
+@login_required
+@manager_required
+def manager_backups():
+    from backup import get_backup_list, check_backup_needed
+    backups = get_backup_list()
+    backup_needed = check_backup_needed()
+    shop_name = get_setting('shop_name', config.SHOP_NAME)
+    return render_template('manager_backups.html', backups=backups,
+                           backup_needed=backup_needed, shop_name=shop_name)
+
+
+@app.route('/manager/backups/now', methods=['POST'])
+@login_required
+@manager_required
+def manager_backups_now():
+    from backup import run_full_backup
+    result = run_full_backup()
+    return jsonify(result)
+
+
+@app.route('/manager/backups/download/<filename>')
+@login_required
+@manager_required
+def manager_backups_download(filename):
+    from backup import BACKUP_DIR
+    return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+
+@app.route('/manager/backups/delete/<filename>', methods=['POST'])
+@login_required
+@manager_required
+def manager_backups_delete(filename):
+    from backup import BACKUP_DIR
+    fp = os.path.join(BACKUP_DIR, filename)
+    if os.path.exists(fp):
+        os.remove(fp)
+        return jsonify({'success': True})
+    return jsonify({'error': 'Not found'}), 404
 
 
 # ====== Errors ======

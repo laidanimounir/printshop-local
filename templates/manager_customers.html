@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — الزبائن</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/qr">📱 أكواد QR</a></li>
+        <li><a href="/manager/workers">👥 العمال</a></li>
+        <li><a href="/manager/customers" class="active">👤 الزبائن</a></li>
+        <li><a href="/manager/reports">📈 التقارير</a></li>
+        <li><a href="/manager/backups">💾 النسخ الاحتياطية</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">الزبائن</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 2fr;gap:16px;">
+        <div class="card">
+          <div class="card-header">🏆 أفضل 10 زبائن</div>
+          <div class="card-body" style="padding:12px;">
+            <table class="table">
+              <thead><tr><th>#</th><th>الهاتف</th><th>الإجمالي</th></tr></thead>
+              <tbody>
+                {% for c in top %}
+                <tr>
+                  <td>{{ loop.index }}</td>
+                  <td><a href="/manager/customers/{{ c.phone }}">{{ c.phone }}</a></td>
+                  <td>{{ c.total_spent|round }} د.ج</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">جميع الزبائن</div>
+          <div class="card-body" style="padding:12px;overflow-x:auto;">
+            <table class="table">
+              <thead><tr><th>الهاتف</th><th>الاسم</th><th>الطلبات</th><th>الإجمالي</th><th>الخصم</th><th>VIP</th><th>الإجراءات</th></tr></thead>
+              <tbody>
+                {% for c in customers %}
+                <tr>
+                  <td><a href="/manager/customers/{{ c.phone }}">{{ c.phone }}</a></td>
+                  <td>{{ c.name or '-' }}</td>
+                  <td>{{ c.total_orders }}</td>
+                  <td>{{ c.total_spent|round }} د.ج</td>
+                  <td>{% if c.discount_percent > 0 %}<span class="badge badge-new">{{ c.discount_percent }}%</span>{% else %}-{% endif %}</td>
+                  <td>{% if c.is_vip %}⭐{% else %}-{% endif %}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline" onclick="setDiscount('{{ c.phone }}')">💰 خصم</button>
+                    <button class="btn btn-sm btn-outline" onclick="toggleVip('{{ c.phone }}')">⭐ VIP</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Discount Modal -->
+  <div class="modal-overlay" id="discountModal">
+    <div class="modal">
+      <div class="modal-title">تعديل الخصم</div>
+      <input type="hidden" id="discountPhone">
+      <div class="form-group">
+        <label class="form-label">نسبة الخصم (%)</label>
+        <input type="number" class="form-input" id="discountPercent" min="0" max="100">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('discountModal')">إلغاء</button>
+        <button class="btn btn-primary" onclick="confirmDiscount()">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    function setDiscount(phone) {
+      document.getElementById('discountPhone').value = phone;
+      document.getElementById('discountPercent').value = 0;
+      openModal('discountModal');
+    }
+
+    function confirmDiscount() {
+      const phone = document.getElementById('discountPhone').value;
+      const discount = document.getElementById('discountPercent').value;
+      const form = new FormData();
+      form.append('phone', phone);
+      form.append('discount', discount);
+      fetch('/manager/customers/discount', { method: 'POST', body: form })
+        .then(r => r.json()).then(d => {
+          if (d.success) { showToast('تم حفظ الخصم', 'success'); closeModal('discountModal'); setTimeout(() => location.reload(), 1000); }
+        });
+    }
+
+    function toggleVip(phone) {
+      fetch('/manager/customers/vip', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({phone: phone})
+      }).then(r => r.json()).then(d => {
+        if (d.success) { showToast(d.is_vip ? 'تمت إضافة VIP' : 'تم إزالة VIP', 'success'); setTimeout(() => location.reload(), 1000); }
+      });
+    }
+  </script>
+</body>
+</html>

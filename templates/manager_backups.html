@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — النسخ الاحتياطية</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/qr">📱 أكواد QR</a></li>
+        <li><a href="/manager/workers">👥 العمال</a></li>
+        <li><a href="/manager/reports">📈 التقارير</a></li>
+        <li><a href="/manager/backups" class="active">💾 النسخ الاحتياطية</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">النسخ الاحتياطية</div>
+        <div>
+          {% if backup_needed %}
+          <span class="badge badge-new" style="background:var(--warning);color:white;">ينصح بعمل نسخة احتياطية</span>
+          {% endif %}
+          <form method="POST" action="/manager/backups/now" style="display:inline;" onsubmit="event.preventDefault();doBackup();">
+            <button class="btn btn-accent" id="backupBtn">💾 نسخ احتياطي الآن</button>
+          </form>
+        </div>
+      </div>
+
+      <div id="backupResult" style="display:none;"></div>
+
+      <div class="card">
+        <div class="card-header">قائمة النسخ الاحتياطية</div>
+        <div class="card-body" style="padding:12px;overflow-x:auto;">
+          {% if backups %}
+          <table class="table">
+            <thead>
+              <tr><th>الملف</th><th>النوع</th><th>التاريخ</th><th>الحجم</th><th>إجراءات</th></tr>
+            </thead>
+            <tbody>
+              {% for b in backups %}
+              <tr>
+                <td>{{ b.name }}</td>
+                <td><span class="badge badge-{{ 'done' if b.type == 'database' else 'printing' }}">{{ b.type }}</span></td>
+                <td>{{ b.date }}</td>
+                <td>{{ (b.size / 1024 / 1024)|round(2) }} MB</td>
+                <td>
+                  <a href="/manager/backups/download/{{ b.name }}" class="btn btn-sm btn-primary">📥 تحميل</a>
+                  <form method="POST" action="/manager/backups/delete/{{ b.name }}" style="display:inline;" onsubmit="return confirm('حذف النسخة الاحتياطية؟')">
+                    <button class="btn btn-sm btn-danger">🗑️ حذف</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="text-align:center;padding:40px;color:var(--text-light);">لا توجد نسخ احتياطية بعد</div>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/static/js/main.js"></script>
+  <script>
+    function doBackup() {
+      const btn = document.getElementById('backupBtn');
+      btn.disabled = true;
+      btn.textContent = 'جاري النسخ الاحتياطي...';
+      fetch('/manager/backups/now', { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          const div = document.getElementById('backupResult');
+          div.style.display = 'block';
+          if (d.database && d.database.success) {
+            div.innerHTML = '<div style="background:var(--success);color:white;padding:12px;border-radius:var(--radius-sm);margin-bottom:16px;">✅ تم النسخ الاحتياطي بنجاح</div>';
+            setTimeout(() => location.reload(), 1500);
+          } else {
+            div.innerHTML = '<div style="background:var(--danger);color:white;padding:12px;border-radius:var(--radius-sm);margin-bottom:16px;">❌ فشل النسخ الاحتياطي</div>';
+          }
+          btn.disabled = false;
+          btn.textContent = '💾 نسخ احتياطي الآن';
+        });
+    }
+  </script>
+</body>
+</html>

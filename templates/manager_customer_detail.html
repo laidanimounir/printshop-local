@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — {{ customer.phone }}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">{% include '_sidebar.html' ignore missing %}
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/customers">👤 الزبائن</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">
+          {% if customer.is_vip %}⭐{% endif %}
+          زبون: {{ customer.phone }}
+          {% if customer.name %}({{ customer.name }}){% endif %}
+        </div>
+        <a href="/manager/customers" class="btn btn-outline">رجوع</a>
+      </div>
+
+      <div class="stats-grid" style="margin-bottom:24px;">
+        <div class="stat-card"><div class="stat-value">{{ customer.total_orders }}</div><div class="stat-label">إجمالي الطلبات</div></div>
+        <div class="stat-card"><div class="stat-value">{{ customer.total_pages }}</div><div class="stat-label">إجمالي الصفحات</div></div>
+        <div class="stat-card"><div class="stat-value">{{ customer.total_spent|round }} د.ج</div><div class="stat-label">إجمالي المصروف</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--accent);">{{ customer.discount_percent }}%</div><div class="stat-label">الخصم</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">سجل الطلبات</div>
+        <div class="card-body" style="padding:12px;overflow-x:auto;">
+          <table class="table">
+            <thead><tr><th>رقم الطلب</th><th>التاريخ</th><th>الملف</th><th>السعر</th><th>الحالة</th></tr></thead>
+            <tbody>
+              {% for o in orders %}
+              <tr>
+                <td>#{{ o.order_number }}</td>
+                <td>{{ o.created_at.strftime('%d/%m/%Y %H:%M') if o.created_at else '' }}</td>
+                <td>{{ o.file_name }}</td>
+                <td>{{ o.price }} د.ج</td>
+                <td><span class="badge badge-{{ o.status }}">{{ o.status }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

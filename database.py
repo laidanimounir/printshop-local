@@ -80,6 +80,56 @@ class Transfer(db.Model):
     order = db.relationship('Order', backref='transfers')
 
 
+class Customer(db.Model):
+    __tablename__ = 'customers'
+    id = db.Column(db.Integer, primary_key=True)
+    phone = db.Column(db.String(20), unique=True, nullable=False)
+    name = db.Column(db.String(100), nullable=True)
+    first_visit = db.Column(db.DateTime, default=datetime.utcnow)
+    last_visit = db.Column(db.DateTime, default=datetime.utcnow)
+    total_orders = db.Column(db.Integer, default=0)
+    total_pages = db.Column(db.Integer, default=0)
+    total_spent = db.Column(db.Float, default=0)
+    discount_percent = db.Column(db.Integer, default=0)
+    notes = db.Column(db.Text, nullable=True)
+    is_vip = db.Column(db.Boolean, default=False)
+
+
+def get_or_create_customer(phone):
+    customer = Customer.query.filter_by(phone=phone).first()
+    if not customer:
+        customer = Customer(phone=phone)
+        db.session.add(customer)
+        db.session.commit()
+    return customer
+
+
+def update_customer_stats(phone):
+    customer = Customer.query.filter_by(phone=phone).first()
+    if not customer:
+        return
+    customer.total_orders = Order.query.filter_by(customer_phone=phone).count()
+    done_orders = Order.query.filter_by(customer_phone=phone, status='done').all()
+    customer.total_pages = sum(o.page_count or 0 for o in done_orders)
+    customer.total_spent = sum(o.price or 0 for o in done_orders)
+    customer.last_visit = datetime.utcnow()
+    apply_auto_discount(customer)
+    db.session.commit()
+
+
+def apply_auto_discount(customer):
+    if customer.total_orders >= 50:
+        customer.discount_percent = 10
+    elif customer.total_orders >= 10:
+        customer.discount_percent = 5
+    else:
+        customer.discount_percent = 0
+
+
+def get_top_customers(limit=10):
+    return Customer.query.order_by(Customer.total_spent.desc()).limit(limit).all()
+
+
 class OrderFile(db.Model):
     __tablename__ = 'order_files'
     id = db.Column(db.Integer, primary_key=True)
