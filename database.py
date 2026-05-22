@@ -60,6 +60,7 @@ class Order(db.Model):
     page_count = db.Column(db.Integer, default=0)
     is_duplex = db.Column(db.Boolean, default=False)
     duplex_status = db.Column(db.String(20), default='none')
+    ai_suggestions = db.Column(db.Text, nullable=True)
     payment_status = db.Column(db.String(10), default='unpaid')
     payment_method = db.Column(db.String(10), default='cash')
     amount_received = db.Column(db.Float, default=0)

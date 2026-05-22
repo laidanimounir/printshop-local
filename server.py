@@ -84,6 +84,9 @@ def submit_order(computer_id):
     is_duplex = request.form.get('is_duplex') == 'on'
     from duplex_print import get_page_count
     pc = get_page_count(file_path)
+    from ai_optimizer import analyze_file
+    ai_result = analyze_file(file_path)
+    ai_suggestions = '|'.join(ai_result.get('suggestions', [])) if ai_result.get('suggestions') else ''
     order = Order(
         order_number=order_number,
         computer_id=computer_id,
@@ -99,7 +102,8 @@ def submit_order(computer_id):
         duplex_status='none',
         status='new',
         price=calculate_price(copies, color_mode, paper_size, pc),
-        page_count=pc
+        page_count=pc,
+        ai_suggestions=ai_suggestions
     )
     db.session.add(order)
     db.session.commit()
@@ -187,6 +191,28 @@ def api_duplex_status(order_id):
         'status': order.status,
         'total_pages': order.page_count
     })
+
+
+@app.route('/worker/optimize/<int:order_id>', methods=['POST'])
+@login_required
+@worker_required
+def worker_optimize(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.computer_id != current_user.computer_id:
+        return jsonify({'error': 'Not your order'}), 403
+    data = request.get_json()
+    fixes = data.get('fixes', [])
+    from ai_optimizer import auto_fix_pdf, analyze_file
+    try:
+        fixed_path = auto_fix_pdf(order.file_path, fixes)
+        order.file_path = fixed_path
+        order.ai_suggestions = ''
+        order.updated_at = datetime.utcnow()
+        db.session.commit()
+        new_analysis = analyze_file(fixed_path)
+        return jsonify({'success': True, 'message': 'تم تحسين الملف', 'analysis': new_analysis})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/worker/print/<int:order_id>', methods=['POST'])
