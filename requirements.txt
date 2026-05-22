@@ -1,0 +1,8 @@
+flask
+flask-login
+flask-sqlalchemy
+pywin32
+qrcode[pil]
+pillow
+reportlab
+werkzeug
