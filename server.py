@@ -386,6 +386,78 @@ def manager_settings():
     return render_template('manager_settings.html', settings=settings, config=config, shop_name=shop_name)
 
 
+# ====== QR Management ======
+
+@app.route('/manager/qr')
+@login_required
+@manager_required
+def manager_qr():
+    shop_name = get_setting('shop_name', config.SHOP_NAME)
+    qr_files = {}
+    for pc_id in config.COMPUTERS:
+        qr_path = os.path.join(config.QR_FOLDER, f"QR_{pc_id}.png")
+        qr_files[pc_id] = os.path.exists(qr_path)
+    return render_template('manager_qr.html', computers=config.COMPUTERS,
+                           qr_files=qr_files, shop_name=shop_name)
+
+
+@app.route('/manager/qr/download/all')
+@login_required
+@manager_required
+def manager_qr_download_all():
+    from qr_generator import generate_all_qr_pdf
+    pdf_path = generate_all_qr_pdf()
+    return send_from_directory(config.QR_FOLDER, "all_qr_codes.pdf",
+                               as_attachment=True,
+                               download_name="all_qr_codes.pdf")
+
+
+@app.route('/manager/qr/download/<pc_id>')
+@login_required
+@manager_required
+def manager_qr_download(pc_id):
+    if pc_id not in config.COMPUTERS:
+        flash('Invalid computer', 'danger')
+        return redirect(url_for('manager_qr'))
+    filename = f"QR_{pc_id}_print.pdf"
+    return send_from_directory(config.QR_FOLDER, filename,
+                               as_attachment=True, download_name=filename)
+
+
+@app.route('/manager/qr/print/all', methods=['POST'])
+@login_required
+@manager_required
+def manager_qr_print_all():
+    from qr_generator import print_qr
+    results = []
+    for pc_id in config.COMPUTERS:
+        r = print_qr(pc_id)
+        results.append({'pc': pc_id, 'success': r.get('success', False)})
+    return jsonify({'results': results})
+
+
+@app.route('/manager/qr/print/<pc_id>', methods=['POST'])
+@login_required
+@manager_required
+def manager_qr_print(pc_id):
+    if pc_id not in config.COMPUTERS:
+        return jsonify({'error': 'Invalid'}), 400
+    from qr_generator import print_qr
+    result = print_qr(pc_id)
+    return jsonify(result)
+
+
+@app.route('/manager/qr/regenerate/<pc_id>', methods=['POST'])
+@login_required
+@manager_required
+def manager_qr_regenerate(pc_id):
+    if pc_id not in config.COMPUTERS:
+        return jsonify({'error': 'Invalid'}), 400
+    from qr_generator import generate_qr_for_computer
+    generate_qr_for_computer(pc_id, config.COMPUTERS[pc_id])
+    return jsonify({'success': True})
+
+
 # ====== API Routes ======
 
 @app.route('/api/orders/<computer_id>')

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — أكواد QR</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/qr" class="active">📱 أكواد QR</a></li>
+        <li><a href="/manager/workers">👥 العمال</a></li>
+        <li><a href="/manager/reports">📈 التقارير</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">طباعة أكواد QR</div>
+        <div style="display:flex;gap:8px;">
+          <form method="POST" action="/manager/qr/print/all" style="display:inline;" onsubmit="return confirm('طباعة جميع أكواد QR؟')">
+            <button class="btn btn-accent">🖨️ طباعة الكل</button>
+          </form>
+          <a href="/manager/qr/download/all" class="btn btn-primary">📥 تحميل PDF الكل</a>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;">
+        {% for pc_id, pc_info in computers.items() %}
+        <div class="card" style="text-align:center;">
+          <div class="card-header">{{ pc_info.get('name', pc_id) }}</div>
+          <div class="card-body">
+            {% if qr_files[pc_id] %}
+            <img src="/qrcodes/QR_{{ pc_id }}.png" alt="QR {{ pc_id }}" style="width:200px;height:auto;margin-bottom:12px;border-radius:8px;">
+            {% else %}
+            <div style="padding:60px 20px;background:var(--gray);border-radius:var(--radius-sm);margin-bottom:12px;color:var(--text-light);">لم يتم توليد QR بعد</div>
+            {% endif %}
+            <div style="font-size:0.9rem;color:var(--text-light);margin-bottom:12px;">{{ pc_info.get('ip', '') }}</div>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+              <form method="POST" action="/manager/qr/print/{{ pc_id }}" style="display:inline;" onsubmit="return confirm('طباعة QR {{ pc_info.get('name', pc_id) }}؟')">
+                <button class="btn btn-sm btn-success">🖨️ طباعة</button>
+              </form>
+              <a href="/manager/qr/download/{{ pc_id }}" class="btn btn-sm btn-primary">📥 تحميل</a>
+              <form method="POST" action="/manager/qr/regenerate/{{ pc_id }}" style="display:inline;" onsubmit="return confirm('إعادة توليد QR {{ pc_info.get('name', pc_id) }}؟')">
+                <button class="btn btn-sm btn-outline">🔄 تجديد</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </main>
+  </div>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

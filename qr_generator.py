@@ -102,5 +102,53 @@ def generate_all_qr_codes():
     print("All QR Codes generated successfully!")
 
 
+def generate_all_qr_pdf():
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas as pdf_canvas
+    import io
+
+    pdf_path = os.path.join(config.QR_FOLDER, "all_qr_codes.pdf")
+    c = pdf_canvas.Canvas(pdf_path, pagesize=A4)
+    a4_w, a4_h = A4
+    margin = 30
+    spacing = 20
+    cols = 2
+    rows = 2
+    cell_w = (a4_w - 2 * margin - (cols - 1) * spacing) / cols
+    cell_h = (a4_h - 2 * margin - (rows - 1) * spacing) / rows
+
+    for idx, (pc_id, pc_info) in enumerate(config.COMPUTERS.items()):
+        if idx > 0 and idx % 4 == 0:
+            c.showPage()
+        pos = idx % 4
+        col = pos % cols
+        row = pos // cols
+        x = margin + col * (cell_w + spacing)
+        y = a4_h - margin - (row + 1) * cell_h - row * spacing
+        qr_img_path = os.path.join(config.QR_FOLDER, f"QR_{pc_id}.png")
+        if os.path.exists(qr_img_path):
+            c.drawImage(qr_img_path, x + 20, y + 30,
+                       width=cell_w - 40, height=cell_h - 60,
+                       preserveAspectRatio=True)
+            c.setFont("Helvetica-Bold", 10)
+            c.drawCentredString(x + cell_w / 2, y + 10,
+                               f"{config.SHOP_NAME} — {pc_info['name']} ({pc_id})")
+    c.save()
+    print(f"  Combined QR PDF saved: {pdf_path}")
+    return pdf_path
+
+
+def print_qr(pc_id, printer_name=None):
+    qr_path = os.path.join(config.QR_FOLDER, f"QR_{pc_id}_print.pdf")
+    if not os.path.exists(qr_path):
+        pc_info = config.COMPUTERS.get(pc_id)
+        if pc_info:
+            generate_qr_for_computer(pc_id, pc_info)
+    if os.path.exists(qr_path):
+        from printer import print_file
+        return print_file(qr_path, 1, 'bw', 'A4', printer_name)
+    return {'success': False, 'error': 'QR not found'}
+
+
 if __name__ == '__main__':
     generate_all_qr_codes()
