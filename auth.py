@@ -67,3 +67,26 @@ def worker_login():
 def worker_logout():
     logout_user()
     return redirect(url_for('auth.worker_login'))
+
+
+@auth_bp.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'message': 'Request must be JSON'}), 400
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    if not username or not password:
+        return jsonify({'success': False, 'message': 'Username and password are required'}), 400
+    worker = Worker.query.filter_by(username=username, is_active=True).first()
+    if worker and worker.check_password(password):
+        login_user(worker)
+        return jsonify({
+            'success': True,
+            'id': worker.id,
+            'role': worker.role,
+            'full_name': worker.full_name,
+            'computer_id': worker.computer_id or '',
+            'username': worker.username,
+        })
+    return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
