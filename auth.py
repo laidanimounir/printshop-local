@@ -77,6 +77,8 @@ def api_logout():
 
 @auth_bp.route('/api/login', methods=['POST'])
 def api_login():
+    db.session.remove()
+    from flask import session as flask_session
     data = request.get_json(silent=True)
     if not data:
         return jsonify({'success': False, 'message': 'Request must be JSON'}), 400
@@ -86,7 +88,8 @@ def api_login():
         return jsonify({'success': False, 'message': 'Username and password are required'}), 400
     worker = Worker.query.filter_by(username=username, is_active=True).first()
     if worker and worker.check_password(password):
-        login_user(worker)
+        flask_session['_user_id'] = str(worker.id)
+        flask_session['_fresh'] = True
         return jsonify({
             'success': True,
             'id': worker.id,
