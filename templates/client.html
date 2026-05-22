@@ -71,6 +71,14 @@
       <input type="hidden" name="paper_size" id="paperSizeInput" value="A4">
     </div>
 
+    <div class="form-group" id="duplexGroup" style="display:none;">
+      <label style="display:flex;align-items:center;gap:8px;padding:12px;background:var(--gray);border-radius:var(--radius-sm);cursor:pointer;">
+        <input type="checkbox" name="is_duplex" id="duplexToggle" onchange="updatePrice()" style="width:20px;height:20px;">
+        <span style="font-weight:600;">طباعة وجهين (Recto-Verso)</span>
+        <span style="font-size:0.8rem;color:var(--text-light);margin-right:auto;">نفس السعر</span>
+      </label>
+    </div>
+
     <div class="form-group">
       <label class="form-label">ملاحظات (اختياري)</label>
       <textarea name="notes" class="form-textarea" placeholder="أي ملاحظات للطباعة..."></textarea>
@@ -117,6 +125,10 @@
         } else {
           document.getElementById('previewImage').src = '/static/images/file-icon.png';
         }
+
+        const isPdf = file.name.toLowerCase().endsWith('.pdf');
+        document.getElementById('duplexGroup').style.display = isPdf ? '' : 'none';
+        if (!isPdf) document.getElementById('duplexToggle').checked = false;
 
         updatePrice();
       }

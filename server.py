@@ -81,6 +81,9 @@ def submit_order(computer_id):
     paper_size = request.form.get('paper_size', 'A4')
     notes = request.form.get('notes', '')
     customer_phone = request.form.get('customer_phone', '')
+    is_duplex = request.form.get('is_duplex') == 'on'
+    from duplex_print import get_page_count
+    pc = get_page_count(file_path)
     order = Order(
         order_number=order_number,
         computer_id=computer_id,
@@ -92,9 +95,11 @@ def submit_order(computer_id):
         color_mode=color_mode,
         paper_size=paper_size,
         notes=notes,
+        is_duplex=is_duplex,
+        duplex_status='none',
         status='new',
-        price=calculate_price(copies, color_mode, paper_size),
-        page_count=1
+        price=calculate_price(copies, color_mode, paper_size, pc),
+        page_count=pc
     )
     db.session.add(order)
     db.session.commit()
@@ -127,6 +132,61 @@ def worker_dashboard():
                            pc=config.COMPUTERS.get(computer_id, {}),
                            computers=computers,
                            shop_name=shop_name)
+
+
+@app.route('/worker/duplex/step1/<int:order_id>', methods=['POST'])
+@login_required
+@worker_required
+def worker_duplex_step1(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.computer_id != current_user.computer_id:
+        return jsonify({'error': 'Not your order'}), 403
+    try:
+        from duplex_print import print_duplex_step1, get_page_count
+        pc = get_page_count(order.file_path)
+        order.status = 'duplex_waiting'
+        order.duplex_status = 'step1_done'
+        order.worker_id = current_user.id
+        order.updated_at = datetime.utcnow()
+        db.session.commit()
+        result = print_duplex_step1(order.file_path, order.copies)
+        if result.get('success'):
+            return jsonify({'success': True, 'message': 'Step 1 done. Flip paper and confirm.', 'total_pages': pc})
+        return jsonify({'success': True, 'message': 'Step 1 sent to printer.', 'total_pages': pc})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/worker/duplex/step2/<int:order_id>', methods=['POST'])
+@login_required
+@worker_required
+def worker_duplex_step2(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.computer_id != current_user.computer_id:
+        return jsonify({'error': 'Not your order'}), 403
+    try:
+        from duplex_print import print_duplex_step2
+        result = print_duplex_step2(order.file_path, order.copies)
+        if result.get('success'):
+            order.status = 'done'
+            order.duplex_status = 'complete'
+            order.updated_at = datetime.utcnow()
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Duplex printing complete'})
+        return jsonify({'success': True, 'message': 'Step 2 sent to printer'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@app.route('/api/duplex/status/<int:order_id>')
+def api_duplex_status(order_id):
+    order = Order.query.get_or_404(order_id)
+    return jsonify({
+        'is_duplex': order.is_duplex,
+        'duplex_status': order.duplex_status,
+        'status': order.status,
+        'total_pages': order.page_count
+    })
 
 
 @app.route('/worker/print/<int:order_id>', methods=['POST'])

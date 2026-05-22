@@ -58,6 +58,8 @@ class Order(db.Model):
     status = db.Column(db.String(20), default='new')
     price = db.Column(db.Float, default=0)
     page_count = db.Column(db.Integer, default=0)
+    is_duplex = db.Column(db.Boolean, default=False)
+    duplex_status = db.Column(db.String(20), default='none')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

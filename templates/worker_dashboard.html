@@ -49,6 +49,7 @@
               <div style="font-size:0.85rem;color:var(--text-light);">{{ order.customer_phone }}</div>
             </div>
             <div style="text-align:left;">
+              {% if order.is_duplex %}<span class="badge badge-printing" style="background:var(--accent);color:var(--dark);">⚡ وجهين</span>{% endif %}
               <span class="badge badge-{{ order.status }}">{{ order.status }}</span>
               <div class="order-time">{{ order.created_at.strftime('%H:%M') if order.created_at else '' }}</div>
             </div>
@@ -67,8 +68,14 @@
           {% endif %}
           <div class="order-actions">
             {% if order.status == 'new' %}
-            <button class="btn btn-success btn-sm" onclick="printOrder({{ order.id }})">🖨️ طباعة</button>
+              {% if order.is_duplex %}
+              <button class="btn btn-success btn-sm" onclick="duplexStep1({{ order.id }})">⚡ وجهين — خطوة 1</button>
+              {% else %}
+              <button class="btn btn-success btn-sm" onclick="printOrder({{ order.id }})">🖨️ طباعة</button>
+              {% endif %}
             <button class="btn btn-outline btn-sm" onclick="openTransferModal({{ order.id }})">↪️ تحويل</button>
+            {% elif order.status == 'duplex_waiting' %}
+            <button class="btn btn-accent btn-sm" onclick="openDuplexFlipModal({{ order.id }})">🔄 متابعة الوجه الثاني</button>
             {% elif order.status == 'printing' %}
             <button class="btn btn-success btn-sm" onclick="markDone({{ order.id }})">✅ منجز</button>
             {% endif %}
@@ -77,6 +84,24 @@
         {% endfor %}
       </div>
     </main>
+  </div>
+
+  <!-- Duplex Flip Paper Modal -->
+  <div class="modal-overlay" id="duplexFlipModal">
+    <div class="modal" style="text-align:center;">
+      <div style="font-size:3rem;margin-bottom:12px;">🔄</div>
+      <div class="modal-title">اقلِب الورق</div>
+      <p style="color:var(--text-light);margin-bottom:20px;line-height:1.8;">
+        تمت طباعة الوجه الأول بنجاح.<br>
+        الآن <strong>اقلِب الورق</strong> وضعه في الطابعة <strong>وجهه للأسفل</strong>،<br>
+        ثم اضغط <strong>متابعة</strong> لطباعة الوجه الثاني.
+      </p>
+      <input type="hidden" id="duplexFlipOrderId">
+      <div class="modal-actions" style="justify-content:center;">
+        <button class="btn btn-outline" onclick="closeDuplexFlipModal()">إلغاء</button>
+        <button class="btn btn-accent btn-lg" onclick="confirmDuplexStep2()">✅ متابعة الطباعة</button>
+      </div>
+    </div>
   </div>
 
   <!-- Transfer Modal -->
@@ -192,6 +217,53 @@
         }
       });
       closeTransferModal();
+    }
+
+    function duplexStep1(orderId) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'جاري...';
+      fetch(`/worker/duplex/step1/${orderId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            showToast('تمت طباعة الوجه الأول', 'success');
+            openDuplexFlipModal(orderId);
+          } else {
+            showToast(d.error || 'خطأ', 'danger');
+            btn.disabled = false;
+            btn.textContent = '⚡ وجهين — خطوة 1';
+          }
+        });
+    }
+
+    function openDuplexFlipModal(orderId) {
+      document.getElementById('duplexFlipOrderId').value = orderId;
+      document.getElementById('duplexFlipModal').classList.add('active');
+    }
+
+    function closeDuplexFlipModal() {
+      document.getElementById('duplexFlipModal').classList.remove('active');
+    }
+
+    function confirmDuplexStep2() {
+      const orderId = document.getElementById('duplexFlipOrderId').value;
+      const btn = document.querySelector('#duplexFlipModal .btn-accent');
+      btn.disabled = true;
+      btn.textContent = 'جاري...';
+      fetch(`/worker/duplex/step2/${orderId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            showToast('تمت طباعة الوجه الثاني بنجاح', 'success');
+            closeDuplexFlipModal();
+            setTimeout(() => location.reload(), 1000);
+          } else {
+            showToast(d.error || 'خطأ', 'danger');
+            btn.disabled = false;
+            btn.textContent = '✅ متابعة الطباعة';
+          }
+        });
     }
 
     function toggleSound() {
