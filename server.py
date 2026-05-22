@@ -652,6 +652,70 @@ def api_orders(computer_id):
     } for o in orders])
 
 
+@app.route('/api/workers')
+def api_workers():
+    if not current_user.is_authenticated or current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    workers = Worker.query.all()
+    return jsonify([{
+        'id': w.id, 'username': w.username, 'full_name': w.full_name,
+        'role': w.role, 'computer_id': w.computer_id or '',
+        'is_active': w.is_active
+    } for w in workers])
+
+
+@app.route('/api/customers')
+def api_customers():
+    if not current_user.is_authenticated or current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    from database import Customer
+    customers = Customer.query.order_by(Customer.last_visit.desc()).all()
+    return jsonify([{
+        'phone': c.phone, 'name': c.name,
+        'total_orders': c.total_orders, 'total_spent': c.total_spent,
+        'discount_percent': c.discount_percent, 'is_vip': c.is_vip,
+        'last_visit': c.last_visit.isoformat() if c.last_visit else None
+    } for c in customers])
+
+
+@app.route('/api/customers/<phone>')
+def api_customers_detail(phone):
+    if not current_user.is_authenticated or current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    from database import Customer
+    customer = Customer.query.filter_by(phone=phone).first()
+    if not customer:
+        return jsonify({'error': 'not found'}), 404
+    orders = Order.query.filter_by(customer_phone=phone)\
+        .order_by(Order.created_at.desc()).all()
+    return jsonify({
+        'phone': customer.phone, 'name': customer.name,
+        'total_orders': customer.total_orders, 'total_spent': customer.total_spent,
+        'discount_percent': customer.discount_percent, 'is_vip': customer.is_vip,
+        'last_visit': customer.last_visit.isoformat() if customer.last_visit else None,
+        'orders': [{
+            'id': o.id, 'order_number': o.order_number,
+            'status': o.status, 'price': o.price,
+            'payment_status': o.payment_status,
+            'created_at': o.created_at.isoformat() if o.created_at else None
+        } for o in orders]
+    })
+
+
+@app.route('/api/backups')
+def api_backups():
+    if not current_user.is_authenticated or current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    from backup import get_backup_list
+    backups = get_backup_list()
+    return jsonify([{
+        'filename': b['name'],
+        'size': str(b['size']),
+        'created_at': b['date'],
+        'type': b['type']
+    } for b in backups])
+
+
 @app.route('/api/me')
 def api_me():
     if not current_user.is_authenticated:
