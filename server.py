@@ -384,13 +384,17 @@ def manager_workers_delete(worker_id):
 @manager_required
 def manager_workers_edit(worker_id):
     w = Worker.query.get_or_404(worker_id)
-    w.full_name = request.form.get('full_name', w.full_name)
-    w.computer_id = request.form.get('computer_id', w.computer_id)
-    w.is_active = request.form.get('is_active') == 'on'
-    password = request.form.get('password', '')
+    is_json = request.is_json
+    source = request.get_json() if is_json else request.form
+    w.full_name = source.get('full_name', w.full_name)
+    w.computer_id = source.get('computer_id', w.computer_id)
+    w.is_active = source.get('is_active', 'on') == 'on' or source.get('is_active') == True
+    password = source.get('password', '')
     if password:
         w.set_password(password)
     db.session.commit()
+    if is_json:
+        return jsonify({'success': True, 'message': 'Worker updated'})
     flash('Worker updated.', 'success')
     return redirect(url_for('manager_workers'))
 
