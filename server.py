@@ -652,6 +652,19 @@ def api_orders(computer_id):
     } for o in orders])
 
 
+@app.route('/api/me')
+def api_me():
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'unauthorized'}), 401
+    return jsonify({
+        'id': current_user.id,
+        'role': current_user.role,
+        'full_name': current_user.full_name,
+        'username': current_user.username,
+        'computer_id': current_user.computer_id or '',
+    })
+
+
 @app.route('/api/stats/today')
 def api_stats_today():
     return jsonify(get_daily_stats())
