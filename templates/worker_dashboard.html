@@ -55,7 +55,7 @@
             </div>
           </div>
           <div class="order-details">
-            <span class="order-detail-item">📄 {{ order.file_name }}</span>
+            <span class="order-detail-item">📄 {% set fname = order.file_name %}{% if ',' in fname %}{{ fname.split(',')|length }} ملفات{% else %}{{ fname }}{% endif %}</span>
             <span class="order-detail-item">📄 {{ order.copies }} نسخ</span>
             <span class="order-detail-item">{{ '🎨 ألوان' if order.color_mode == 'color' else '⚫ أبيض وأسود' }}</span>
             <span class="order-detail-item">📐 {{ order.paper_size }}</span>
@@ -66,6 +66,9 @@
             <span class="order-detail-item" style="color:var(--success);">✅ مدفوع</span>
             {% elif order.payment_status == 'unpaid' and order.status == 'done' %}
             <span class="order-detail-item" style="color:var(--danger);">⚠️ غير مدفوع</span>
+            {% endif %}
+            {% if order.page_count %}
+            <span class="order-detail-item">{{ order.page_count }} صفحة</span>
             {% endif %}
           </div>
           {% if order.notes %}

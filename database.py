@@ -80,6 +80,20 @@ class Transfer(db.Model):
     order = db.relationship('Order', backref='transfers')
 
 
+class OrderFile(db.Model):
+    __tablename__ = 'order_files'
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
+    file_path = db.Column(db.String(256), nullable=False)
+    file_name = db.Column(db.String(256), nullable=False)
+    file_type = db.Column(db.String(10), nullable=True)
+    page_count = db.Column(db.Integer, default=0)
+    thumbnail_path = db.Column(db.String(256), nullable=True)
+    print_status = db.Column(db.String(20), default='pending')
+    sort_order = db.Column(db.Integer, default=0)
+    order = db.relationship('Order', backref='order_files')
+
+
 class Setting(db.Model):
     __tablename__ = 'settings'
     id = db.Column(db.Integer, primary_key=True)

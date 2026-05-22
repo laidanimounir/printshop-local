@@ -29,18 +29,12 @@
 
     <div class="form-group">
       <div class="file-upload-zone" id="fileZone" onclick="document.getElementById('fileInput').click()">
-        <div class="file-upload-zone-icon">📄</div>
-        <div class="file-upload-zone-text">اضغط لاختيار ملف</div>
-        <div style="font-size:0.8rem;color:var(--text-light);margin-top:4px;">PDF, JPG, PNG, DOCX, XLSX</div>
+        <div class="file-upload-zone-icon">📂</div>
+        <div class="file-upload-zone-text">اضغط لاختيار ملف أو عدة ملفات</div>
+        <div style="font-size:0.8rem;color:var(--text-light);margin-top:4px;">PDF, JPG, PNG, DOCX, XLSX — حتى 10 ملفات</div>
       </div>
-      <input type="file" name="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.pptx" style="display:none" required>
-      <div class="file-preview" id="filePreview">
-        <img id="previewImage" src="" alt="Preview">
-        <div class="file-preview-info">
-          <div class="file-preview-name" id="fileName">-</div>
-          <div class="file-preview-size" id="fileSize">-</div>
-        </div>
-      </div>
+      <input type="file" name="files" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.pptx" style="display:none" multiple>
+      <div id="fileList"></div>
     </div>
 
     <div class="form-group">
@@ -90,7 +84,8 @@
     </div>
 
     <div class="price-display" id="priceDisplay">
-      <span id="priceValue">10</span> <small>د.ج</small>
+      <div style="font-size:0.9rem;color:var(--text-light);" id="filesCount">0 ملفات</div>
+      <span id="priceValue">0</span> <small>د.ج</small>
     </div>
 
     <button type="submit" class="btn btn-accent btn-lg btn-block" id="submitBtn">
@@ -107,34 +102,77 @@
     const PRICE_BW = {{ config.PRICE_BW_PER_PAGE }};
     const PRICE_COLOR = {{ config.PRICE_COLOR_PER_PAGE }};
     const PRICE_A3_MULT = {{ config.PRICE_A3_MULTIPLIER }};
+    let selectedFiles = [];
 
     document.getElementById('fileInput').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        document.getElementById('fileZone').classList.add('has-file');
-        document.getElementById('filePreview').classList.add('active');
-        document.getElementById('fileName').textContent = file.name;
-        document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
-
-        if (file.type.startsWith('image/')) {
-          const reader = new FileReader();
-          reader.onload = function(ev) {
-            document.getElementById('previewImage').src = ev.target.result;
-          };
-          reader.readAsDataURL(file);
-        } else {
-          document.getElementById('previewImage').src = '/static/images/file-icon.png';
-        }
-
-        const isPdf = file.name.toLowerCase().endsWith('.pdf');
-        document.getElementById('duplexGroup').style.display = isPdf ? '' : 'none';
-        if (!isPdf) document.getElementById('duplexToggle').checked = false;
-
-        updatePrice();
+      const newFiles = Array.from(e.target.files);
+      const remaining = 10 - selectedFiles.length;
+      if (newFiles.length > remaining) {
+        showToast(`الحد الأقصى 10 ملفات. يمكنك إضافة ${remaining} فقط.`, 'warning');
+        newFiles.splice(remaining);
       }
+      newFiles.forEach(f => {
+        if (selectedFiles.findIndex(sf => sf.name === f.name && sf.size === f.size) === -1) {
+          selectedFiles.push(f);
+        }
+      });
+      renderFileList();
+      updatePrice();
+      this.value = '';
     });
 
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      renderFileList();
+      updatePrice();
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    function renderFileList() {
+      const container = document.getElementById('fileList');
+      const zone = document.getElementById('fileZone');
+      if (selectedFiles.length === 0) {
+        container.innerHTML = '';
+        zone.classList.remove('has-file');
+        document.getElementById('filesCount').textContent = '0 ملفات';
+        return;
+      }
+      zone.classList.add('has-file');
+      document.getElementById('filesCount').textContent = selectedFiles.length + ' ملفات';
+      let html = '';
+      selectedFiles.forEach((f, i) => {
+        const isPdf = f.name.toLowerCase().endsWith('.pdf');
+        html += `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--gray);border-radius:var(--radius-sm);margin-bottom:6px;">
+            <span style="font-size:1.3rem;">${isPdf ? '📄' : '🖼️'}</span>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.name}</div>
+              <div style="font-size:0.8rem;color:var(--text-light);">${formatFileSize(f.size)}</div>
+            </div>
+            <button type="button" onclick="removeFile(${i})" style="background:none;border:none;color:var(--danger);font-size:1.2rem;cursor:pointer;">✕</button>
+          </div>
+        `;
+      });
+      if (selectedFiles.length < 10) {
+        html += `<button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('fileInput').click()" style="margin-top:4px;">+ إضافة ملف آخر</button>`;
+      }
+      container.innerHTML = html;
+    }
+
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      if (selectedFiles.length === 0) {
+        e.preventDefault();
+        showToast('الرجاء اختيار ملف على الأقل', 'warning');
+        return;
+      }
+      const dt = new DataTransfer();
+      selectedFiles.forEach(f => dt.items.add(f));
+      document.getElementById('fileInput').files = dt.files;
       document.getElementById('submitBtn').disabled = true;
       document.getElementById('submitBtn').textContent = 'جاري الإرسال...';
     });
@@ -172,7 +210,8 @@
       const paperSize = document.getElementById('paperSizeInput').value;
       const perPage = colorMode === 'color' ? PRICE_COLOR : PRICE_BW;
       const mult = paperSize === 'A3' ? PRICE_A3_MULT : 1;
-      const total = copies * perPage * mult;
+      const fileCount = selectedFiles.length || 1;
+      const total = copies * perPage * mult * fileCount;
       document.getElementById('priceValue').textContent = total;
     }
   </script>

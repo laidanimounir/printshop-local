@@ -7,7 +7,7 @@ from flask import (
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app import app
-from database import db, Order, Worker, Transfer, Setting, generate_order_number, get_daily_stats, auto_delete_old_files
+from database import db, Order, OrderFile, Worker, Transfer, Setting, generate_order_number, get_daily_stats, auto_delete_old_files
 from auth import auth_bp, login_manager, worker_required, manager_required
 import config
 
@@ -61,51 +61,64 @@ def upload_page(computer_id):
 def submit_order(computer_id):
     if computer_id not in config.COMPUTERS:
         return jsonify({'error': 'Invalid computer'}), 400
-    if 'file' not in request.files:
-        flash('Please select a file.', 'danger')
+    files = request.files.getlist('files')
+    if not files or len(files) == 0 or (len(files) == 1 and files[0].filename == ''):
+        flash('Please select at least one file.', 'danger')
         return redirect(url_for('upload_page', computer_id=computer_id))
-    file = request.files['file']
-    if file.filename == '':
-        flash('No file selected.', 'danger')
+    if len(files) > 10:
+        flash('Maximum 10 files per order.', 'danger')
         return redirect(url_for('upload_page', computer_id=computer_id))
-    if not allowed_file(file.filename):
-        flash('File type not supported.', 'danger')
-        return redirect(url_for('upload_page', computer_id=computer_id))
+    for f in files:
+        if f.filename and not allowed_file(f.filename):
+            flash(f'File type not supported: {f.filename}', 'danger')
+            return redirect(url_for('upload_page', computer_id=computer_id))
     order_number = generate_order_number()
-    ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
-    safe_name = f"{order_number}_{secure_filename(file.filename)}"
-    file_path = os.path.join(config.UPLOAD_FOLDER, safe_name)
-    file.save(file_path)
     copies = int(request.form.get('copies', 1))
     color_mode = request.form.get('color_mode', 'bw')
     paper_size = request.form.get('paper_size', 'A4')
     notes = request.form.get('notes', '')
     customer_phone = request.form.get('customer_phone', '')
     is_duplex = request.form.get('is_duplex') == 'on'
-    from duplex_print import get_page_count
-    pc = get_page_count(file_path)
+    from file_handler import process_multiple_files, get_file_info
+    file_results = process_multiple_files(files, order_number)
+    total_pages = sum(r.get('page_count', 1) for r in file_results)
+    total_price = calculate_price(copies, color_mode, paper_size, total_pages)
     from ai_optimizer import analyze_file
-    ai_result = analyze_file(file_path)
+    first_file = file_results[0]['file_path']
+    ai_result = analyze_file(first_file)
     ai_suggestions = '|'.join(ai_result.get('suggestions', [])) if ai_result.get('suggestions') else ''
     order = Order(
         order_number=order_number,
         computer_id=computer_id,
         customer_phone=customer_phone,
-        file_path=file_path,
-        file_name=file.filename,
-        file_type=ext,
+        file_path=file_results[0]['file_path'],
+        file_name=', '.join(r['original_name'] for r in file_results),
+        file_type='multi',
         copies=copies,
         color_mode=color_mode,
         paper_size=paper_size,
-        notes=notes,
+        notes=f"{len(file_results)} files - {notes}" if notes else f"{len(file_results)} files",
         is_duplex=is_duplex,
         duplex_status='none',
         status='new',
-        price=calculate_price(copies, color_mode, paper_size, pc),
-        page_count=pc,
+        price=total_price,
+        page_count=total_pages,
         ai_suggestions=ai_suggestions
     )
     db.session.add(order)
+    db.session.commit()
+    for r in file_results:
+        of = OrderFile(
+            order_id=order.id,
+            file_path=r['file_path'],
+            file_name=r['original_name'],
+            file_type=r['file_type'],
+            page_count=r.get('page_count', 1),
+            thumbnail_path=r.get('thumbnail_path'),
+            print_status='pending',
+            sort_order=0
+        )
+        db.session.add(of)
     db.session.commit()
     return redirect(url_for('confirm_page', order_number=order_number))
 
@@ -526,6 +539,15 @@ def api_orders(computer_id):
 @app.route('/api/stats/today')
 def api_stats_today():
     return jsonify(get_daily_stats())
+
+
+@app.route('/api/order/files/<int:order_id>')
+def api_order_files(order_id):
+    files = OrderFile.query.filter_by(order_id=order_id).order_by(OrderFile.sort_order).all()
+    return jsonify([{
+        'id': f.id, 'file_name': f.file_name, 'file_type': f.file_type,
+        'page_count': f.page_count, 'print_status': f.print_status
+    } for f in files])
 
 
 @app.route('/api/cashier/summary')

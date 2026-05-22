@@ -16,9 +16,9 @@ def validate_file(filename, content_length):
     return True, None
 
 
-def save_upload(file, order_number):
+def save_upload(file, order_number, index=0):
     original_name = secure_filename(file.filename)
-    safe_name = f"{order_number}_{original_name}"
+    safe_name = f"{order_number}_{index}_{original_name}"
     file_path = os.path.join(config.UPLOAD_FOLDER, safe_name)
     file.save(file_path)
     return file_path, original_name
@@ -42,8 +42,9 @@ def get_file_info(file_path):
             thumbnail_path = f"uploads/thumbs/{thumb_name}"
         elif ext == 'pdf':
             try:
-                from PIL import Image as PILImage
-                page_count = 1
+                from pypdf import PdfReader
+                reader = PdfReader(file_path)
+                page_count = len(reader.pages)
             except Exception:
                 page_count = 1
     except Exception:
@@ -57,3 +58,13 @@ def get_file_info(file_path):
         'size_bytes': size_bytes,
         'thumbnail_path': thumbnail_path
     }
+
+
+def process_multiple_files(files, order_number):
+    results = []
+    for idx, file in enumerate(files):
+        file_path, original_name = save_upload(file, order_number, idx)
+        info = get_file_info(file_path)
+        info['original_name'] = original_name
+        results.append(info)
+    return results
