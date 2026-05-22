@@ -69,6 +69,12 @@ def worker_logout():
     return redirect(url_for('auth.worker_login'))
 
 
+@auth_bp.route('/api/logout', methods=['POST'])
+def api_logout():
+    logout_user()
+    return jsonify({'success': True, 'message': 'Logged out successfully'})
+
+
 @auth_bp.route('/api/login', methods=['POST'])
 def api_login():
     data = request.get_json(silent=True)
