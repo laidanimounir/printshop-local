@@ -156,8 +156,7 @@ def worker_dashboard():
 @worker_required
 def worker_duplex_step1(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     try:
         from duplex_print import print_duplex_step1, get_page_count
         pc = get_page_count(order.file_path)
@@ -179,8 +178,7 @@ def worker_duplex_step1(order_id):
 @worker_required
 def worker_duplex_step2(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     try:
         from duplex_print import print_duplex_step2
         result = print_duplex_step2(order.file_path, order.copies)
@@ -211,8 +209,7 @@ def api_duplex_status(order_id):
 @worker_required
 def worker_optimize(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     data = request.get_json()
     fixes = data.get('fixes', [])
     from ai_optimizer import auto_fix_pdf, analyze_file
@@ -233,8 +230,7 @@ def worker_optimize(order_id):
 @worker_required
 def worker_print(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     order.status = 'printing'
     order.worker_id = current_user.id
     order.updated_at = datetime.utcnow()
@@ -256,8 +252,7 @@ def worker_print(order_id):
 @worker_required
 def worker_payment(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     data = request.get_json()
     amount_received = float(data.get('amount_received', 0))
     payment_method = data.get('payment_method', 'cash')
@@ -280,8 +275,7 @@ def worker_payment(order_id):
 @worker_required
 def worker_done(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     order.payment_status = 'unpaid'
     order.status = 'done'
     order.worker_id = current_user.id
@@ -295,8 +289,7 @@ def worker_done(order_id):
 @worker_required
 def worker_transfer(order_id):
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     data = request.get_json()
     to_computer = data.get('to_computer')
     reason = data.get('reason', '')
@@ -627,8 +620,7 @@ def api_queue_redirect(order_id, target_pc):
     if target_pc not in config.COMPUTERS:
         return jsonify({'error': 'Invalid target'}), 400
     order = Order.query.get_or_404(order_id)
-    if order.computer_id != current_user.computer_id:
-        return jsonify({'error': 'Not your order'}), 403
+    
     transfer = Transfer(
         order_id=order.id,
         from_computer=order.computer_id,
