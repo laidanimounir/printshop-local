@@ -52,6 +52,14 @@ test("worker.js exists", os.path.exists("static/js/worker.js"))
 test("manifest.json exists", os.path.exists("static/manifest.json"))
 test("sw.js exists", os.path.exists("static/sw.js"))
 test("PWA manifest is valid JSON", open("static/manifest.json", encoding='utf-8').read().strip().startswith("{"))
+test("duplex_print.py exists", os.path.exists("duplex_print.py"))
+test("ai_optimizer.py exists", os.path.exists("ai_optimizer.py"))
+test("queue_manager.py exists", os.path.exists("queue_manager.py"))
+test("backup.py exists", os.path.exists("backup.py"))
+test("manager_qr.html exists", os.path.exists("templates/manager_qr.html"))
+test("manager_backups.html exists", os.path.exists("templates/manager_backups.html"))
+test("manager_customers.html exists", os.path.exists("templates/manager_customers.html"))
+test("manager_customer_detail.html exists", os.path.exists("templates/manager_customer_detail.html"))
 
 # 2. Config
 print("\n[2] Configuration")
@@ -154,6 +162,18 @@ with test_app.test_client() as client:
     resp = client.get('/api/orders/PC1')
     test("GET /api/orders/PC1 returns JSON", resp.status_code == 200)
 
+    resp = client.get('/manager/qr')
+    test("GET /manager/qr accessible", resp.status_code in (200, 302))
+
+    resp = client.get('/api/queue/status')
+    test("GET /api/queue/status returns JSON", resp.status_code == 200)
+
+    resp = client.get('/manager/backups')
+    test("GET /manager/backups accessible", resp.status_code in (200, 302))
+
+    resp = client.get('/manager/customers')
+    test("GET /manager/customers accessible", resp.status_code in (200, 302))
+
     resp = client.get('/hotspot-detect.html')
     test("Captive portal /hotspot-detect.html redirects", resp.status_code in (302, 200))
 
@@ -170,8 +190,57 @@ test("QR folder exists", os.path.isdir("qrcodes"))
 qr_path = os.path.join("qrcodes", "QR_PC1.png")
 test("QR_PC1.png exists", os.path.exists(qr_path))
 
-# 6. Logo
-print("\n[6] Logo Generator")
+# 6. Phase 2 Modules
+print("\n[6] Phase 2 Modules")
+from queue_manager import get_station_load, get_least_busy_station, get_overloaded_stations
+with test_app.app_context():
+    load = get_station_load()
+    test("Queue station load returns dict", isinstance(load, dict))
+    test("Queue station load has PC1", 'PC1' in load)
+    least = get_least_busy_station()
+    test("Least busy station found", least is not None)
+
+from backup import run_full_backup, get_backup_list, cleanup_old_backups, BACKUP_DIR
+import tempfile
+old_backup_dir = None
+import os
+if os.path.isdir(BACKUP_DIR):
+    old_backup_dir = tempfile.mkdtemp()
+    os.rmdir(old_backup_dir)
+    os.rename(BACKUP_DIR, old_backup_dir)
+try:
+    result = run_full_backup()
+    test("Full backup runs and returns dict", isinstance(result, dict))
+    test("Full backup has database key", 'database' in result)
+    bfiles = get_backup_list()
+    test("Backup list returns list", isinstance(bfiles, list))
+finally:
+    import shutil
+    if os.path.isdir(BACKUP_DIR):
+        shutil.rmtree(BACKUP_DIR, ignore_errors=True)
+    if old_backup_dir and os.path.isdir(old_backup_dir):
+        os.rename(old_backup_dir, BACKUP_DIR)
+
+from duplex_print import split_pdf_odd_even
+test("Duplex split PDF function exists", callable(split_pdf_odd_even))
+
+from ai_optimizer import analyze_file
+test("AI optimizer analyze_file exists", callable(analyze_file))
+
+from database import Customer, get_or_create_customer, update_customer_stats, get_top_customers
+with test_app.app_context():
+    cust = get_or_create_customer('0555000000')
+    test("Customer created/retrieved", cust is not None)
+    test("Customer phone matches", cust.phone == '0555000000')
+    total_before = cust.total_orders
+    update_customer_stats('0555000000')
+    test("Customer stats updated", True)
+    top = get_top_customers(5)
+    test("Top customers returns list", isinstance(top, list))
+    test("Top customers limited to 5", len(top) <= 5)
+
+# 7. Logo
+print("\n[7] Logo Generator")
 from generate_logo import generate_logo, generate_pwa_icons
 logo_path = os.path.join("static", "images", "logo.png")
 test("Logo file exists", os.path.exists(logo_path))
@@ -180,8 +249,8 @@ test("PWA icon 192 exists", os.path.exists(icon_192))
 icon_512 = os.path.join("static", "images", "icon_512.png")
 test("PWA icon 512 exists", os.path.exists(icon_512))
 
-# 7. Security
-print("\n[7] Security")
+# 8. Security
+print("\n[8] Security")
 from security import sanitize_filename, validate_file_extension, sanitize_phone
 test("Filename sanitized", sanitize_filename("hello world!.pdf") == "hello_world.pdf")
 test("Filename prevents path traversal", '/' not in sanitize_filename("../../etc/passwd"))
