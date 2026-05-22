@@ -60,6 +60,10 @@ class Order(db.Model):
     page_count = db.Column(db.Integer, default=0)
     is_duplex = db.Column(db.Boolean, default=False)
     duplex_status = db.Column(db.String(20), default='none')
+    payment_status = db.Column(db.String(10), default='unpaid')
+    payment_method = db.Column(db.String(10), default='cash')
+    amount_received = db.Column(db.Float, default=0)
+    change_given = db.Column(db.Float, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

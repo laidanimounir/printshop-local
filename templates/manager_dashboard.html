@@ -32,7 +32,10 @@
       <div class="stats-grid" id="todayStats">
         <div class="stat-card"><div class="stat-value" id="statOrders">-</div><div class="stat-label">طلبات اليوم</div></div>
         <div class="stat-card"><div class="stat-value" id="statPages">-</div><div class="stat-label">صفحات اليوم</div></div>
-        <div class="stat-card"><div class="stat-value" id="statRevenue">-</div><div class="stat-label">إيرادات اليوم</div></div>
+        <div class="stat-card"><div class="stat-value" id="statRevenue">-</div><div class="stat-label">الإيرادات</div></div>
+        <div class="stat-card"><div class="stat-value" id="statCash">-</div><div class="stat-label">نقداً</div></div>
+        <div class="stat-card"><div class="stat-value" id="statCard">-</div><div class="stat-label">بطاقة</div></div>
+        <div class="stat-card"><div class="stat-value" id="statUnpaid" style="color:var(--danger);">-</div><div class="stat-label">غير مدفوع</div></div>
         <div class="stat-card"><div class="stat-value" id="statWorkers">-</div><div class="stat-label">العمال النشطون</div></div>
       </div>
 
@@ -57,6 +60,7 @@
                 <th>الملف</th>
                 <th>الحالة</th>
                 <th>السعر</th>
+                <th>الدفع</th>
                 <th>التاريخ</th>
                 <th>إجراءات</th>
               </tr>
@@ -70,6 +74,7 @@
                 <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ order.file_name }}</td>
                 <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
                 <td>{{ order.price or '-' }}</td>
+                <td>{% if order.payment_status == 'paid' %}<span class="badge badge-done">مدفوع</span>{% elif order.payment_status == 'unpaid' %}<span class="badge badge-new" style="background:var(--danger);color:white;">غير مدفوع</span>{% else %}-{% endif %}</td>
                 <td>{{ order.created_at.strftime('%H:%M %d/%m') if order.created_at else '' }}</td>
                 <td>
                   {% if order.status == 'new' %}
@@ -93,6 +98,11 @@
       document.getElementById('statOrders').textContent = d.orders || 0;
       document.getElementById('statPages').textContent = d.pages || 0;
       document.getElementById('statRevenue').textContent = (d.revenue || 0) + ' د.ج';
+    });
+    fetch('/api/cashier/summary').then(r=>r.json()).then(d=>{
+      document.getElementById('statCash').textContent = (d.cash_total || 0) + ' د.ج';
+      document.getElementById('statCard').textContent = (d.card_total || 0) + ' د.ج';
+      document.getElementById('statUnpaid').textContent = d.unpaid_count || 0;
     });
     document.getElementById('statWorkers').textContent = {{ workers|length }};
   </script>

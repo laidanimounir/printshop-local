@@ -62,6 +62,11 @@
             {% if order.price %}
             <span class="order-detail-item" style="font-weight:700;color:var(--accent);">{{ order.price }} د.ج</span>
             {% endif %}
+            {% if order.payment_status == 'paid' %}
+            <span class="order-detail-item" style="color:var(--success);">✅ مدفوع</span>
+            {% elif order.payment_status == 'unpaid' and order.status == 'done' %}
+            <span class="order-detail-item" style="color:var(--danger);">⚠️ غير مدفوع</span>
+            {% endif %}
           </div>
           {% if order.notes %}
           <div style="font-size:0.85rem;color:var(--text-light);margin-bottom:8px;">📝 {{ order.notes }}</div>
@@ -77,7 +82,8 @@
             {% elif order.status == 'duplex_waiting' %}
             <button class="btn btn-accent btn-sm" onclick="openDuplexFlipModal({{ order.id }})">🔄 متابعة الوجه الثاني</button>
             {% elif order.status == 'printing' %}
-            <button class="btn btn-success btn-sm" onclick="markDone({{ order.id }})">✅ منجز</button>
+            <button class="btn btn-success btn-sm" onclick="openPaymentModal({{ order.id }}, {{ order.price or 0 }})">💰 تسوية الدفع</button>
+            <button class="btn btn-sm btn-outline" onclick="markDone({{ order.id }})">✅ منجز (بدون دفع)</button>
             {% endif %}
           </div>
         </div>
@@ -100,6 +106,38 @@
       <div class="modal-actions" style="justify-content:center;">
         <button class="btn btn-outline" onclick="closeDuplexFlipModal()">إلغاء</button>
         <button class="btn btn-accent btn-lg" onclick="confirmDuplexStep2()">✅ متابعة الطباعة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Modal -->
+  <div class="modal-overlay" id="paymentModal">
+    <div class="modal">
+      <div class="modal-title">💰 تسوية الدفع</div>
+      <input type="hidden" id="paymentOrderId">
+      <div style="text-align:center;padding:16px;background:var(--gray);border-radius:var(--radius-sm);margin-bottom:16px;">
+        <div style="font-size:0.9rem;color:var(--text-light);">المبلغ المستحق</div>
+        <div style="font-size:2rem;font-weight:800;color:var(--primary);" id="paymentDue">0</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المبلغ المستلم</label>
+        <input type="number" class="form-input" id="paymentReceived" oninput="calculateChange()" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">الباقي</label>
+        <div style="font-size:1.5rem;font-weight:700;color:var(--success);" id="paymentChange">0 د.ج</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">طريقة الدفع</label>
+        <div class="toggle-group" id="paymentMethodToggle">
+          <button type="button" class="toggle-option active" data-value="cash" onclick="setPaymentMethod('cash')">💰 نقداً</button>
+          <button type="button" class="toggle-option" data-value="card" onclick="setPaymentMethod('card')">💳 بطاقة</button>
+          <button type="button" class="toggle-option" data-value="free" onclick="setPaymentMethod('free')">🎁 مجاني</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closePaymentModal()">إلغاء</button>
+        <button class="btn btn-success btn-lg" onclick="confirmPayment()">✅ تأكيد وإغلاق</button>
       </div>
     </div>
   </div>
@@ -264,6 +302,69 @@
             btn.textContent = '✅ متابعة الطباعة';
           }
         });
+    }
+
+    let selectedPaymentMethod = 'cash';
+
+    function openPaymentModal(orderId, price) {
+      document.getElementById('paymentOrderId').value = orderId;
+      document.getElementById('paymentDue').textContent = price + ' د.ج';
+      document.getElementById('paymentReceived').value = '';
+      document.getElementById('paymentChange').textContent = '0 د.ج';
+      selectedPaymentMethod = 'cash';
+      document.querySelectorAll('#paymentMethodToggle .toggle-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.value === 'cash');
+      });
+      document.getElementById('paymentModal').classList.add('active');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('paymentModal').classList.remove('active');
+    }
+
+    function setPaymentMethod(method) {
+      selectedPaymentMethod = method;
+      document.querySelectorAll('#paymentMethodToggle .toggle-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.value === method);
+      });
+      if (method === 'free') {
+        document.getElementById('paymentReceived').value = 0;
+        calculateChange();
+      }
+    }
+
+    function calculateChange() {
+      const due = parseFloat(document.getElementById('paymentDue').textContent) || 0;
+      const received = parseFloat(document.getElementById('paymentReceived').value) || 0;
+      const change = Math.max(0, received - due);
+      document.getElementById('paymentChange').textContent = change.toFixed(0) + ' د.ج';
+    }
+
+    function confirmPayment() {
+      const orderId = document.getElementById('paymentOrderId').value;
+      const received = parseFloat(document.getElementById('paymentReceived').value) || 0;
+      if (selectedPaymentMethod !== 'free' && received <= 0) {
+        showToast('الرجاء إدخال المبلغ المستلم', 'warning');
+        return;
+      }
+      const btn = document.querySelector('#paymentModal .btn-success');
+      btn.disabled = true;
+      btn.textContent = 'جاري...';
+      fetch(`/worker/payment/${orderId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ amount_received: received, payment_method: selectedPaymentMethod })
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          showToast('تم تأكيد الدفع. الباقي: ' + d.change + ' د.ج', 'success');
+          closePaymentModal();
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showToast(d.error || 'خطأ', 'danger');
+          btn.disabled = false;
+          btn.textContent = '✅ تأكيد وإغلاق';
+        }
+      });
     }
 
     function toggleSound() {

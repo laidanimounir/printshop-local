@@ -212,6 +212,27 @@ def worker_print(order_id):
         return jsonify({'success': False, 'error': str(e)})
 
 
+@app.route('/worker/payment/<int:order_id>', methods=['POST'])
+@login_required
+@worker_required
+def worker_payment(order_id):
+    order = Order.query.get_or_404(order_id)
+    if order.computer_id != current_user.computer_id:
+        return jsonify({'error': 'Not your order'}), 403
+    data = request.get_json()
+    amount_received = float(data.get('amount_received', 0))
+    payment_method = data.get('payment_method', 'cash')
+    order.payment_status = 'paid'
+    order.payment_method = payment_method
+    order.amount_received = amount_received
+    order.change_given = max(0, amount_received - (order.price or 0))
+    order.status = 'done'
+    order.worker_id = current_user.id
+    order.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True, 'change': order.change_given})
+
+
 @app.route('/worker/done/<int:order_id>', methods=['POST'])
 @login_required
 @worker_required
@@ -219,6 +240,7 @@ def worker_done(order_id):
     order = Order.query.get_or_404(order_id)
     if order.computer_id != current_user.computer_id:
         return jsonify({'error': 'Not your order'}), 403
+    order.payment_status = 'unpaid'
     order.status = 'done'
     order.worker_id = current_user.id
     order.updated_at = datetime.utcnow()
@@ -478,6 +500,29 @@ def api_orders(computer_id):
 @app.route('/api/stats/today')
 def api_stats_today():
     return jsonify(get_daily_stats())
+
+
+@app.route('/api/cashier/summary')
+def api_cashier_summary():
+    from datetime import date
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+    end = datetime.combine(today, datetime.max.time())
+    orders = Order.query.filter(
+        Order.created_at >= start,
+        Order.created_at <= end
+    ).all()
+    cash_total = sum(o.amount_received or 0 for o in orders if o.payment_method == 'cash' and o.payment_status == 'paid')
+    card_total = sum(o.amount_received or 0 for o in orders if o.payment_method == 'card' and o.payment_status == 'paid')
+    free_count = sum(1 for o in orders if o.payment_method == 'free')
+    unpaid_count = sum(1 for o in orders if o.payment_status == 'unpaid')
+    return jsonify({
+        'cash_total': cash_total,
+        'card_total': card_total,
+        'free_count': free_count,
+        'unpaid_count': unpaid_count,
+        'total_collected': cash_total + card_total
+    })
 
 
 @app.route('/api/orders/new/<computer_id>')
