@@ -1,0 +1,14 @@
+{
+  "name": "LAIDANI PHONE Print",
+  "short_name": "LP Print",
+  "description": "إرسال ملفات الطباعة إلى LAIDANI PHONE",
+  "start_url": "/upload/PC1",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#6B3F1F",
+  "background_color": "#FFF8F0",
+  "icons": [
+    {"src": "/static/images/icon_192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/images/icon_512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
