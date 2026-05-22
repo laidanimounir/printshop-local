@@ -89,4 +89,4 @@ def api_login():
             'computer_id': worker.computer_id or '',
             'username': worker.username,
         })
-    return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+    return jsonify({'success': False, 'message': 'اسم المستخدم أو كلمة المرور غير صحيحة'}), 401
