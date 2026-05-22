@@ -1,200 +1,195 @@
-# 🖨️ PrintShop Local — نظام استقبال طلبات الطباعة
+```
+  _      ____       _       _   _   _      ___   _   _   _____
+ | |    |  _ \     (_)     | \ | | | |    |_ _| | \ | | | ____|
+ | |    | |_) |     _      |  \| | | |     | |  |  \| | |  _|
+ | |___ |  __/     | |     | |\  | | |___  | |  | |\  | | |___
+ |_____||_|        |_|     |_| \_| |_____||___| |_| \_| |_____|
 
-> نظام محلي بدون إنترنت يسمح للزبائن بإرسال ملفاتهم للطباعة عبر مسح QR Code واحد فقط.
+  🖨️ نظام استقبال طلبات الطباعة — LAIDANI PHONE 🇩🇿
+```
+
+[![Python](https://img.shields.io/badge/Python-3.8%2B-6B3F1F?style=flat&logo=python&logoColor=F5C518)](https://python.org)
+[![Flask](https://img.shields.io/badge/Flask-2.0%2B-8B5E3C?style=flat&logo=flask&logoColor=white)](https://flask.palletsprojects.com)
+[![License](https://img.shields.io/badge/License-MIT-F5C518?style=flat)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-2ECC71?style=flat)]()
+[![Platform](https://img.shields.io/badge/Platform-Windows-3498DB?style=flat&logo=windows&logoColor=white)]()
 
 ---
 
-## 💡 فكرة المشروع
+**PrintShop Local** هو نظام محلي (بدون إنترنت) لأتمتة محلات الطباعة. الزبون يمسح QR Code قدام أي كمبيوتر في المحل، يرفع ملفه، ويستلم رقم طلب — بدون واتساب، بدون تطبيق، بدون إنترنت.
 
-```
-📱 الزبون يمسح QR Code
-        ↓
-✅ يوصل WiFi المحل تلقائياً
-        ↓
-🌐 تفتح صفحة الإرسال تلقائياً (Captive Portal)
-        ↓
-📁 يرفع ملفه + يختار خيارات الطباعة + يكتب رقمه
-        ↓
-🔔 إشعار صوتي على حاسوبك
-        ↓
-💻 تطبع مباشرة من لوحة التحكم
-```
-
-**بدون واتساب — بدون تليغرام — بدون إنترنت — بدون تطبيق للزبون ✅**
+> **🇫🇷** Système local de gestion des impressions. Le client scanne un QR Code, télécharge son fichier, et reçoit un numéro de commande — sans WhatsApp, sans application, sans Internet.
 
 ---
 
-## 🗂️ هيكل المشروع
+## ✨ المميزات
+
+| الميزة | الوصف |
+|--------|-------|
+| 📱 **Captive Portal** | اتصال تلقائي بشبكة WiFi + فتح الصفحة تلقائياً |
+| 🖨️ **طباعة مباشرة** | طباعة بضغطة زر عبر win32print |
+| 🔔 **إشعارات صوتية** | صوت عند وصول طلب جديد |
+| 🔄 **تحويل الطلبات** | تحويل بين المحطات عند عطل الطابعة |
+| 📊 **تقارير وإحصائيات** | رسوم بيانية، إيرادات، ساعات الذروة |
+| 👥 **إدارة العمال** | 4 عمال + مدير، صلاحيات مختلفة |
+| 📦 **PWA** | تثبيت كتطبيق على هاتف الزبون |
+| 🌐 **Supabase** | جاهز للمزامنة السحابية (غير مفعل افتراضياً) |
+| ⚙️ **إعدادات متغيرة** | أسعار، أسماء، كل شيء قابل للتعديل |
+
+## 🗺️ بنية الشبكة
 
 ```
-print-shop/
-│
-├── server.py              ← السيرفر الرئيسي (Flask)
-├── config.py              ← إعدادات المشروع (اسم المحل، سعر الصفحة...)
-├── database.py            ← إدارة قاعدة البيانات (SQLite)
-├── printer.py             ← الطباعة المباشرة (win32print)
-├── qr_generator.py        ← توليد QR Code
-├── setup.bat              ← تشغيل كل شيء بضغطة واحدة (Windows)
-├── requirements.txt       ← مكتبات Python المطلوبة
-│
-├── templates/
-│   ├── client.html        ← صفحة الزبون (مُحسَّنة للموبايل)
-│   ├── dashboard.html     ← لوحة التحكم الخاصة بك
-│   ├── confirm.html       ← صفحة تأكيد الاستلام للزبون
-│   └── reports.html       ← التقارير والإحصائيات
-│
-├── static/
-│   ├── style.css          ← تصميم الواجهات
-│   ├── app.js             ← التفاعل والإشعارات
-│   └── logo.png           ← شعار المحل
-│
-├── uploads/               ← مجلد الملفات الواصلة (يُنشأ تلقائياً)
-│
-└── db/
-    └── orders.db          ← قاعدة البيانات (تُنشأ تلقائياً)
+                    ┌──────────────────┐
+                    │   موجه WiFi      │
+                    │  LAIDANI_PRINT   │
+                    │  192.168.1.1     │
+                    └────────┬─────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+    ┌─────┴─────┐    ┌──────┴──────┐    ┌─────┴─────┐
+    │  PC1      │    │  PC2       │    │  PC3      │
+    │  192.168. │    │  192.168.  │    │  192.168. │
+    │  1.101    │    │  1.102     │    │  1.103    │
+    │  Station 1│    │  Station 2 │    │  Station 3│
+    │  👨‍🔧 w1   │    │  👨‍🔧 w2    │    │  👨‍🔧 w3   │
+    └───────────┘    └────────────┘    └───────────┘
 ```
 
----
+## 🚀 تركيب سريع
 
-## 🛠️ التقنيات المستخدمة
-
-| الأداة | الدور | مجاني؟ |
-|--------|-------|--------|
-| Python 3.x | لغة البرمجة الأساسية | ✅ |
-| Flask | السيرفر المحلي | ✅ |
-| SQLite | قاعدة البيانات | ✅ |
-| HTML + CSS + JS | واجهات المستخدم | ✅ |
-| win32print | طباعة مباشرة على Windows | ✅ |
-| qrcode + pillow | توليد QR Code | ✅ |
-| hostapd / المودم | إنشاء WiFi + Captive Portal | ✅ |
-| VS Code | محرر الكود | ✅ |
-
----
-
-## 📦 مكتبات Python المطلوبة
-
-```
-flask
-pywin32
-qrcode[pil]
-pillow
-```
-
-تثبيت دفعة واحدة:
 ```bash
-pip install flask pywin32 qrcode[pil] pillow
+# 1. شغل setup.bat كمسؤول
+setup.bat
+
+# 2. شغل السيرفر
+start.bat
 ```
 
----
+أو يدوياً:
+```bash
+pip install -r requirements.txt
+python server.py
+```
 
-## ⚙️ متطلبات الجهاز
+## 🔑 الحسابات الافتراضية
 
-- **نظام التشغيل:** Windows 10 أو أحدث
-- **Python:** 3.8 أو أحدث
-- **مودم WiFi صغير:** Router منفصل (~15 دولار)
-- **طابعة:** متصلة بالحاسوب
+| المستخدم | كلمة السر | الدور |
+|----------|-----------|-------|
+| `admin` | `admin123` | مدير 👑 |
+| `worker1` | `pass1` | Station 1 |
+| `worker2` | `pass2` | Station 2 |
+| `worker3` | `pass3` | Station 3 |
+| `worker4` | `pass4` | Station 4 |
 
----
+## 📂 هيكل المشروع
 
-## 🚀 خطة البناء (بالترتيب)
+```
+printshop-local/
+├── app.py              ← إنشاء تطبيق Flask
+├── server.py           ← جميع المسارات (Routes)
+├── config.py           ← الإعدادات
+├── database.py         ← قاعدة البيانات (SQLite + SQLAlchemy)
+├── auth.py             ← التوثيق (Flask-Login)
+├── printer.py          ← الطباعة (win32print)
+├── qr_generator.py     ← توليد QR Code
+├── generate_logo.py    ← توليد الشعار
+├── file_handler.py     ← معالجة الملفات المرفوعة
+├── receipt_generator.py ← طباعة وصل الاستلام
+├── security.py         ← الأمان والتحقق
+├── logger.py           ← تسجيل الأحداث
+├── captive_portal.py   ← نظام Captive Portal
+├── supabase_sync.py    ← مزامنة سحابية (Supabase)
+├── seed_data.py        ← بيانات تجريبية
+├── test_system.py      ← اختبارات آلية
+├── templates/          ← قوالب HTML
+│   ├── client.html     ← صفحة الزبون
+│   ├── confirm.html    ← صفحة التأكيد
+│   ├── worker_login.html
+│   ├── worker_dashboard.html
+│   ├── manager_dashboard.html
+│   ├── manager_workers.html
+│   ├── manager_reports.html
+│   ├── manager_settings.html
+│   ├── 404.html / 500.html / 413.html
+├── static/
+│   ├── css/main.css    ← التصميم الكامل
+│   ├── js/main.js      ← JavaScript العام
+│   ├── js/worker.js    ← JavaScript العامل
+│   ├── manifest.json   ← PWA manifest
+│   └── sw.js           ← Service Worker
+├── uploads/            ← الملفات المرفوعة
+├── qrcodes/            ← أكواد QR المولدة
+└── db/                 ← قاعدة البيانات
+```
 
-### الأسبوع 1 — النواة الأساسية
-- [ ] إعداد السيرفر (server.py)
-- [ ] صفحة الزبون (client.html) — رفع ملف + خيارات + رقم هاتف
-- [ ] لوحة التحكم (dashboard.html) — عرض الطلبات
+## 🛠️ التقنيات
 
-### الأسبوع 2 — قاعدة البيانات والطباعة
-- [ ] قاعدة البيانات (database.py)
-- [ ] الطباعة المباشرة (printer.py)
-- [ ] الإشعار الصوتي عند وصول طلب جديد
+| التقنية | الاستخدام |
+|---------|-----------|
+| Python 3.14 | لغة البرمجة |
+| Flask | إطار العمل |
+| SQLAlchemy + SQLite | قاعدة البيانات |
+| Flask-Login | التوثيق |
+| win32print | الطباعة على Windows |
+| Pillow | معالجة الصور |
+| qrcode | توليد QR Code |
+| ReportLab | توليد PDF |
+| Chart.js | الرسوم البيانية |
+| PWA | تطبيق ويب قابل للتثبيت |
 
-### الأسبوع 3 — التقارير والـ QR
-- [ ] صفحة التقارير والإحصائيات (reports.html)
-- [ ] توليد QR Code (qr_generator.py)
-- [ ] إعداد Captive Portal (صفحة تفتح تلقائياً)
+## 📡 API Reference
 
-### الأسبوع 4 — الاختبار والتشطيب
-- [ ] اختبار كامل للنظام
-- [ ] ملف التشغيل التلقائي (setup.bat)
-- [ ] تصحيح الأخطاء وتحسين الأداء
+### Public
+- `GET /upload/<computer_id>` — صفحة رفع الملفات
+- `POST /submit/<computer_id>` — رفع ملف + إنشاء طلب
+- `GET /confirm/<order_number>` — صفحة التأكيد
 
----
+### Worker
+- `GET /worker/dashboard` — لوحة العامل
+- `POST /worker/print/<id>` — طباعة
+- `POST /worker/done/<id>` — تأكيد الإنجاز
+- `POST /worker/transfer/<id>` — تحويل الطلب
 
-## 📱 واجهة الزبون — المحتوى
+### Manager
+- `GET /manager/dashboard` — لوحة المدير
+- `GET /manager/workers` — إدارة العمال
+- `GET /manager/reports` — التقارير
+- `GET /manager/reports/export` — تصدير PDF
+- `GET/POST /manager/settings` — الإعدادات
 
-- رفع ملف (PDF / صورة / Word / Excel)
-- معاينة الملف قبل الإرسال
-- اختيار: أبيض وأسود / ألوان
-- عدد النسخ
-- حجم الورق (A4 / A3 / غيره)
-- ملاحظات إضافية
-- رقم الهاتف
-- زر الإرسال
-- صفحة تأكيد برقم الطلب
+### API JSON
+- `GET /api/orders/<computer_id>` — قائمة الطلبات
+- `GET /api/orders/new/<computer_id>?since=N` — الطلبات الجديدة (polling)
+- `GET /api/stats/today` — إحصائيات اليوم
 
----
+## 🗺️ Roadmap
 
-## 💻 لوحة التحكم — المحتوى
+### ✅ الإصدار 1.0 (حالي)
+- النظام الأساسي كامل مع 4 محطات
+- QR Code لكل محطة
+- لوحة تحكم العامل والمدير
+- التقارير والإحصائيات
+- نظام تحويل الطلبات
 
-- قائمة الطلبات الواصلة في الوقت الحقيقي
-- تفاصيل كل طلب (الملف / الخيارات / رقم الهاتف)
-- تغيير حالة الطلب: 🟡 جديد ← 🔵 قيد الطباعة ← ✅ منجز
-- طباعة مباشرة بضغطة زر
-- بحث برقم الهاتف أو رقم الطلب
-- حذف الملفات القديمة تلقائياً
+### 🔄 الإصدار 2.0 (قريباً)
+- مزامنة Supabase
+- نسخ احتياطي تلقائي
+- إشعارات SMS للزبون
 
----
-
-## 📊 التقارير والإحصائيات
-
-- عدد الطلبات: يومياً / أسبوعياً / شهرياً
-- أكثر وقت ازدحام في اليوم
-- إجمالي الصفحات المطبوعة
-- الأرباح (بناءً على سعر الصفحة في config.py)
-- تصدير التقرير كـ PDF
-
----
-
-## 🔮 المراحل المستقبلية
-
-### المرحلة 2 — مزامنة الإنترنت
-- نسخ احتياطي تلقائي للملفات على السحابة
-- لوحة تحكم يمكن الوصول إليها من أي مكان
-- إشعار للزبون عند جهوز الطلب (SMS)
-
-### المرحلة 3 — تطبيق الهاتف
-- تطبيق Android + iPhone
-- إشعار للزبون "ملفك جاهز"
+### 📱 الإصدار 3.0 (مستقبل)
+- تطبيق Flutter للزبون
+- إشعار "ملفك جاهز"
 - متابعة حالة الطلب
-- تقييم الخدمة
+
+## 🤝 المساهمة
+
+المشروع مفتوح المصدر. رحّب بالمساهمات!
+
+## 📄 التراخيص
+
+MIT License — حر في الاستخدام والتعديل والتوزيع.
 
 ---
 
-## 🔧 إعدادات config.py
-
-```python
-SHOP_NAME = "اسم محلك"
-WIFI_NAME = "PrintShop"
-SERVER_IP = "192.168.1.1"
-PORT = 5000
-PRICE_PER_PAGE_BW = 10      # سعر الصفحة أبيض وأسود (بالعملة المحلية)
-PRICE_PER_PAGE_COLOR = 30   # سعر الصفحة ألوان
-MAX_FILE_SIZE_MB = 50
-ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png", "docx", "xlsx"]
-AUTO_DELETE_DAYS = 7        # حذف الملفات القديمة بعد 7 أيام
-```
-
----
-
-## 📋 ملاحظات مهمة
-
-- الزبون يجب أن يكون على **WiFi المحل** لاستخدام النظام
-- QR Code يجب **طباعته ووضعه على الطاولة** بشكل واضح
-- حاسوبك يجب أن يكون **شغالاً** لاستقبال الطلبات
-- النظام يعمل **بدون إنترنت** بالكامل
-
----
-
-## 👨‍💻 صاحب المشروع
-
-مشروع خاص لأتمتة عمل محل طباعة — بُني من الصفر لحل مشكلة حقيقية.
+<p align="center">🖨️ <strong>LAIDANI PHONE</strong> — طباعة سريعة واحترافية 🇩🇿</p>
