@@ -1,28 +1,18 @@
 import os
 from datetime import datetime
 from flask import (
-    Flask, render_template, request, redirect, url_for,
-    flash, jsonify, send_from_directory, session
+    render_template, request, redirect, url_for,
+    flash, jsonify, send_from_directory
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from database import db, init_db, Order, Worker, Transfer, Setting, generate_order_number, get_daily_stats
+from app import app
+from database import db, Order, Worker, Transfer, Setting, generate_order_number, get_daily_stats, auto_delete_old_files
 from auth import auth_bp, login_manager, worker_required, manager_required
 import config
 
-app = Flask(__name__)
-app.secret_key = config.SECRET_KEY
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{config.DB_PATH}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['MAX_CONTENT_LENGTH'] = config.MAX_FILE_SIZE_MB * 1024 * 1024
-app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
-
-init_db(app)
 login_manager.init_app(app)
 app.register_blueprint(auth_bp)
-
-os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(config.QR_FOLDER, exist_ok=True)
 
 
 def allowed_file(filename):
@@ -71,32 +61,26 @@ def upload_page(computer_id):
 def submit_order(computer_id):
     if computer_id not in config.COMPUTERS:
         return jsonify({'error': 'Invalid computer'}), 400
-
     if 'file' not in request.files:
         flash('Please select a file.', 'danger')
         return redirect(url_for('upload_page', computer_id=computer_id))
-
     file = request.files['file']
     if file.filename == '':
         flash('No file selected.', 'danger')
         return redirect(url_for('upload_page', computer_id=computer_id))
-
     if not allowed_file(file.filename):
         flash('File type not supported.', 'danger')
         return redirect(url_for('upload_page', computer_id=computer_id))
-
     order_number = generate_order_number()
     ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
     safe_name = f"{order_number}_{secure_filename(file.filename)}"
     file_path = os.path.join(config.UPLOAD_FOLDER, safe_name)
     file.save(file_path)
-
     copies = int(request.form.get('copies', 1))
     color_mode = request.form.get('color_mode', 'bw')
     paper_size = request.form.get('paper_size', 'A4')
     notes = request.form.get('notes', '')
     customer_phone = request.form.get('customer_phone', '')
-
     order = Order(
         order_number=order_number,
         computer_id=computer_id,
@@ -114,7 +98,6 @@ def submit_order(computer_id):
     )
     db.session.add(order)
     db.session.commit()
-
     return redirect(url_for('confirm_page', order_number=order_number))
 
 
@@ -123,10 +106,7 @@ def confirm_page(order_number):
     order = Order.query.filter_by(order_number=order_number).first_or_404()
     pc = config.COMPUTERS.get(order.computer_id, {})
     shop_name = get_setting('shop_name', config.SHOP_NAME)
-    return render_template('confirm.html',
-                           order=order,
-                           pc=pc,
-                           shop_name=shop_name)
+    return render_template('confirm.html', order=order, pc=pc, shop_name=shop_name)
 
 
 # ====== Worker Routes ======
@@ -226,10 +206,8 @@ def manager_dashboard():
         stats[pc_id] = {'name': config.COMPUTERS[pc_id]['name'], 'new_count': cnt}
     shop_name = get_setting('shop_name', config.SHOP_NAME)
     return render_template('manager_dashboard.html',
-                           orders=orders,
-                           workers=workers,
-                           stats=stats,
-                           computers=config.COMPUTERS,
+                           orders=orders, workers=workers,
+                           stats=stats, computers=config.COMPUTERS,
                            shop_name=shop_name)
 
 
@@ -240,8 +218,7 @@ def manager_workers():
     workers = Worker.query.all()
     shop_name = get_setting('shop_name', config.SHOP_NAME)
     return render_template('manager_workers.html',
-                           workers=workers,
-                           computers=config.COMPUTERS,
+                           workers=workers, computers=config.COMPUTERS,
                            shop_name=shop_name)
 
 
@@ -256,13 +233,9 @@ def manager_workers_add():
     if Worker.query.filter_by(username=username).first():
         flash('Username already exists.', 'danger')
     else:
-        w = Worker(
-            username=username,
-            full_name=full_name,
-            computer_id=computer_id if computer_id else None,
-            role='worker',
-            is_active=True
-        )
+        w = Worker(username=username, full_name=full_name,
+                   computer_id=computer_id if computer_id else None,
+                   role='worker', is_active=True)
         w.set_password(password)
         db.session.add(w)
         db.session.commit()
@@ -303,8 +276,7 @@ def manager_workers_edit(worker_id):
 @manager_required
 def manager_reports():
     shop_name = get_setting('shop_name', config.SHOP_NAME)
-    return render_template('manager_reports.html',
-                           shop_name=shop_name)
+    return render_template('manager_reports.html', shop_name=shop_name)
 
 
 @app.route('/manager/reports/export')
@@ -315,10 +287,8 @@ def manager_reports_export():
     from reportlab.pdfgen import canvas
     import io
     from flask import send_file
-
     today = datetime.utcnow().date()
     stats = get_daily_stats(today)
-    
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     c.setFont("Helvetica-Bold", 20)
@@ -330,7 +300,9 @@ def manager_reports_export():
     c.drawString(50, 710, f"Total Revenue: {stats['revenue']} DZD")
     c.save()
     buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name=f'report_{today}.pdf', mimetype='application/pdf')
+    return send_file(buf, as_attachment=True,
+                     download_name=f'report_{today}.pdf',
+                     mimetype='application/pdf')
 
 
 @app.route('/manager/settings', methods=['GET', 'POST'])
@@ -349,13 +321,9 @@ def manager_settings():
         db.session.commit()
         flash('Settings saved.', 'success')
         return redirect(url_for('manager_settings'))
-    
     settings = {s.key: s.value for s in Setting.query.all()}
     shop_name = get_setting('shop_name', config.SHOP_NAME)
-    return render_template('manager_settings.html',
-                           settings=settings,
-                           config=config,
-                           shop_name=shop_name)
+    return render_template('manager_settings.html', settings=settings, config=config, shop_name=shop_name)
 
 
 # ====== API Routes ======
@@ -365,14 +333,10 @@ def api_orders(computer_id):
     orders = Order.query.filter_by(computer_id=computer_id)\
         .order_by(Order.created_at.desc()).limit(50).all()
     return jsonify([{
-        'id': o.id,
-        'order_number': o.order_number,
-        'customer_phone': o.customer_phone,
-        'file_name': o.file_name,
-        'copies': o.copies,
-        'color_mode': o.color_mode,
-        'paper_size': o.paper_size,
-        'status': o.status,
+        'id': o.id, 'order_number': o.order_number,
+        'customer_phone': o.customer_phone, 'file_name': o.file_name,
+        'copies': o.copies, 'color_mode': o.color_mode,
+        'paper_size': o.paper_size, 'status': o.status,
         'price': o.price,
         'created_at': o.created_at.isoformat() if o.created_at else None,
         'notes': o.notes
@@ -381,8 +345,7 @@ def api_orders(computer_id):
 
 @app.route('/api/stats/today')
 def api_stats_today():
-    stats = get_daily_stats()
-    return jsonify(stats)
+    return jsonify(get_daily_stats())
 
 
 @app.route('/api/orders/new/<computer_id>')
@@ -398,53 +361,45 @@ def api_new_orders(computer_id):
         Order.status == 'new'
     ).order_by(Order.created_at.asc()).all()
     return jsonify([{
-        'id': o.id,
-        'order_number': o.order_number,
-        'customer_phone': o.customer_phone,
-        'file_name': o.file_name,
-        'copies': o.copies,
-        'color_mode': o.color_mode,
-        'paper_size': o.paper_size,
-        'price': o.price,
+        'id': o.id, 'order_number': o.order_number,
+        'customer_phone': o.customer_phone, 'file_name': o.file_name,
+        'copies': o.copies, 'color_mode': o.color_mode,
+        'paper_size': o.paper_size, 'price': o.price,
         'created_at': o.created_at.isoformat() if o.created_at else None
     } for o in orders])
 
-
-# ====== Static Files ======
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(config.UPLOAD_FOLDER, filename)
 
 
-# ====== Captive Portal Handlers ======
-
+# ====== Captive Portal ======
 @app.route('/hotspot-detect.html')
 def apple_captive():
     return redirect(url_for('upload_page', computer_id='PC1'))
 
-
 @app.route('/generate_204')
 def android_captive():
-    return redirect(url_for('upload_page', computer_id='PC1'))
-
+    return '', 204
 
 @app.route('/ncsi.txt')
 def windows_captive():
+    return 'Microsoft NCSI', 200, {'Content-Type': 'text/plain'}
+
+@app.route('/success.html')
+def generic_captive():
     return redirect(url_for('upload_page', computer_id='PC1'))
 
 
-# ====== Error Handlers ======
-
+# ====== Errors ======
 @app.errorhandler(404)
 def not_found(e):
     return render_template('404.html'), 404
 
-
 @app.errorhandler(500)
 def server_error(e):
     return render_template('500.html'), 500
-
 
 @app.errorhandler(413)
 def too_large(e):
@@ -452,9 +407,16 @@ def too_large(e):
 
 
 if __name__ == '__main__':
-    print(f"  {config.SHOP_NAME} - PrintShop Server")
-    print(f"  Server: http://0.0.0.0:{config.SERVER_PORT}")
-    print(f"  Upload: http://localhost:{config.SERVER_PORT}/upload/PC1")
-    print(f"  Worker: http://localhost:{config.SERVER_PORT}/worker/login")
-    print(f"  Manager: http://localhost:{config.SERVER_PORT}/manager/dashboard")
-    app.run(host='0.0.0.0', port=config.SERVER_PORT, debug=True)
+    import sys
+    if '--setup' in sys.argv:
+        with app.app_context():
+            from database import create_default_workers
+            create_default_workers()
+        print("Setup complete.")
+    else:
+        print(f"  {config.SHOP_NAME} - PrintShop Server")
+        print(f"  Server: http://0.0.0.0:{config.SERVER_PORT}")
+        print(f"  Upload: http://localhost:{config.SERVER_PORT}/upload/PC1")
+        print(f"  Worker: http://localhost:{config.SERVER_PORT}/worker/login")
+        print(f"  Manager: http://localhost:{config.SERVER_PORT}/manager/dashboard")
+        app.run(host='0.0.0.0', port=config.SERVER_PORT, debug=True)
