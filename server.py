@@ -637,6 +637,28 @@ def api_queue_redirect(order_id, target_pc):
 
 # ====== API Routes ======
 
+@app.route('/api/orders/all')
+@login_required
+def api_orders_all():
+    if current_user.role != 'manager':
+        return jsonify({'error': 'unauthorized'}), 401
+    orders = Order.query.order_by(Order.created_at.desc()).all()
+    return jsonify([{
+        'id': o.id, 'order_number': o.order_number,
+        'customer_phone': o.customer_phone, 'file_name': o.file_name,
+        'copies': o.copies, 'color_mode': o.color_mode,
+        'paper_size': o.paper_size, 'status': o.status,
+        'price': o.price, 'payment_status': o.payment_status,
+        'payment_method': o.payment_method,
+        'amount_received': o.amount_received,
+        'page_count': o.page_count, 'is_duplex': o.is_duplex,
+        'duplex_status': o.duplex_status, 'computer_id': o.computer_id,
+        'worker_id': o.worker_id, 'notes': o.notes,
+        'created_at': o.created_at.isoformat() if o.created_at else None,
+        'updated_at': o.updated_at.isoformat() if o.updated_at else None
+    } for o in orders])
+
+
 @app.route('/api/orders/<computer_id>')
 def api_orders(computer_id):
     orders = Order.query.filter_by(computer_id=computer_id)\
