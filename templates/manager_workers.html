@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — إدارة العمال</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/workers" class="active">👥 العمال</a></li>
+        <li><a href="/manager/reports">📈 التقارير</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">إدارة العمال</div>
+        <button class="btn btn-accent" onclick="document.getElementById('addModal').classList.add('active')">+ إضافة عامل</button>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div style="background:{{ 'var(--success)' if category == 'success' else 'var(--danger)' }};color:white;padding:12px;border-radius:var(--radius-sm);margin-bottom:16px;">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <div class="card">
+        <div class="card-body" style="padding:12px;overflow-x:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>الاسم</th>
+                <th>اسم المستخدم</th>
+                <th>المحطة</th>
+                <th>الدور</th>
+                <th>الحالة</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for worker in workers %}
+              <tr>
+                <td>{{ worker.full_name }}</td>
+                <td>{{ worker.username }}</td>
+                <td>{{ computers.get(worker.computer_id, {}).get('name', worker.computer_id or '-') }}</td>
+                <td><span class="badge badge-{{ 'new' if worker.role == 'manager' else 'printing' }}">{{ worker.role }}</span></td>
+                <td>{{ 'نشط' if worker.is_active else 'غير نشط' }}</td>
+                <td>
+                  {% if worker.role != 'manager' %}
+                  <button class="btn btn-sm btn-outline" onclick="editWorker({{ worker.id }}, '{{ worker.full_name }}', '{{ worker.username }}', '{{ worker.computer_id or '' }}', {{ 'true' if worker.is_active else 'false' }})">✏️ تعديل</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteWorker({{ worker.id }})">🗑️ حذف</button>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add Modal -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal">
+      <div class="modal-title">إضافة عامل جديد</div>
+      <form method="POST" action="/manager/workers/add">
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" name="full_name" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">اسم المستخدم</label>
+          <input type="text" name="username" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور</label>
+          <input type="password" name="password" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">المحطة</label>
+          <select name="computer_id" class="form-select">
+            <option value="">بدون محطة</option>
+            {% for cid, cinfo in computers.items() %}
+            <option value="{{ cid }}">{{ cinfo.get('name', cid) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('addModal').classList.remove('active')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">إضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <div class="modal-title">تعديل العامل</div>
+      <form method="POST" id="editForm">
+        <div class="form-group">
+          <label class="form-label">الاسم الكامل</label>
+          <input type="text" name="full_name" id="editName" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">كلمة المرور (اترك فارغاً إن لم ترد التغيير)</label>
+          <input type="password" name="password" class="form-input">
+        </div>
+        <div class="form-group">
+          <label class="form-label">المحطة</label>
+          <select name="computer_id" id="editComputer" class="form-select">
+            <option value="">بدون محطة</option>
+            {% for cid, cinfo in computers.items() %}
+            <option value="{{ cid }}">{{ cinfo.get('name', cid) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="is_active" id="editActive" style="width:18px;height:18px;">
+            <span>نشط</span>
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('editModal').classList.remove('active')">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    function editWorker(id, name, username, computer, active) {
+      document.getElementById('editForm').action = `/manager/workers/edit/${id}`;
+      document.getElementById('editName').value = name;
+      document.getElementById('editComputer').value = computer;
+      document.getElementById('editActive').checked = active;
+      document.getElementById('editModal').classList.add('active');
+    }
+
+    function deleteWorker(id) {
+      if (confirm('هل أنت متأكد من حذف هذا العامل?')) {
+        fetch(`/manager/workers/delete/${id}`, { method: 'POST' })
+          .then(r => r.json())
+          .then(d => {
+            if (d.success) location.reload();
+            else showToast(d.error, 'danger');
+          });
+      }
+    }
+  </script>
+</body>
+</html>

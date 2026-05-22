@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — {{ pc.get('name', 'Dashboard') }}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">{{ pc.get('name', computer_id) }}</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/worker/dashboard" class="active">📋 الطلبات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div>
+          <div class="worker-title">
+            طلبات {{ pc.get('name', computer_id) }}
+            <span class="new-order-badge" id="newCount">0</span>
+          </div>
+        </div>
+        <div>
+          <span class="worker-clock" id="clock"></span>
+          <button onclick="toggleSound()" id="soundToggle" style="background:none;border:none;color:var(--accent);font-size:1.2rem;cursor:pointer;margin-right:12px;">🔔</button>
+        </div>
+      </div>
+
+      <div class="filter-tabs">
+        <button class="filter-tab active" data-filter="all" onclick="filterOrders('all')">الكل</button>
+        <button class="filter-tab" data-filter="new" onclick="filterOrders('new')">جديد</button>
+        <button class="filter-tab" data-filter="printing" onclick="filterOrders('printing')">قيد الطباعة</button>
+        <button class="filter-tab" data-filter="done" onclick="filterOrders('done')">منجز</button>
+      </div>
+
+      <div id="ordersContainer">
+        {% for order in orders %}
+        <div class="order-card status-{{ order.status }}" data-status="{{ order.status }}" data-id="{{ order.id }}">
+          <div class="order-card-header">
+            <div>
+              <div class="order-number">#{{ order.order_number }}</div>
+              <div style="font-size:0.85rem;color:var(--text-light);">{{ order.customer_phone }}</div>
+            </div>
+            <div style="text-align:left;">
+              <span class="badge badge-{{ order.status }}">{{ order.status }}</span>
+              <div class="order-time">{{ order.created_at.strftime('%H:%M') if order.created_at else '' }}</div>
+            </div>
+          </div>
+          <div class="order-details">
+            <span class="order-detail-item">📄 {{ order.file_name }}</span>
+            <span class="order-detail-item">📄 {{ order.copies }} نسخ</span>
+            <span class="order-detail-item">{{ '🎨 ألوان' if order.color_mode == 'color' else '⚫ أبيض وأسود' }}</span>
+            <span class="order-detail-item">📐 {{ order.paper_size }}</span>
+            {% if order.price %}
+            <span class="order-detail-item" style="font-weight:700;color:var(--accent);">{{ order.price }} د.ج</span>
+            {% endif %}
+          </div>
+          {% if order.notes %}
+          <div style="font-size:0.85rem;color:var(--text-light);margin-bottom:8px;">📝 {{ order.notes }}</div>
+          {% endif %}
+          <div class="order-actions">
+            {% if order.status == 'new' %}
+            <button class="btn btn-success btn-sm" onclick="printOrder({{ order.id }})">🖨️ طباعة</button>
+            <button class="btn btn-outline btn-sm" onclick="openTransferModal({{ order.id }})">↪️ تحويل</button>
+            {% elif order.status == 'printing' %}
+            <button class="btn btn-success btn-sm" onclick="markDone({{ order.id }})">✅ منجز</button>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Transfer Modal -->
+  <div class="modal-overlay" id="transferModal">
+    <div class="modal">
+      <div class="modal-title">تحويل الطلب</div>
+      <input type="hidden" id="transferOrderId">
+      <div class="form-group">
+        <label class="form-label">تحويل إلى</label>
+        <select class="form-select" id="transferTarget">
+          {% for cid, cinfo in computers.items() %}
+          <option value="{{ cid }}">{{ cinfo.get('name', cid) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">السبب (اختياري)</label>
+        <input type="text" class="form-input" id="transferReason" placeholder="مشكل في الطابعة، ازدحام...">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeTransferModal()">إلغاء</button>
+        <button class="btn btn-primary" onclick="confirmTransfer()">تأكيد التحويل</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/worker.js"></script>
+  <script>
+    const COMPUTER_ID = '{{ computer_id }}';
+    let lastOrderId = 0;
+    let soundEnabled = true;
+
+    {% if orders %}
+    lastOrderId = {{ orders[0].id if orders else 0 }};
+    {% endif %}
+
+    function updateNewCount() {
+      const count = document.querySelectorAll('.order-card.status-new').length;
+      document.getElementById('newCount').textContent = count;
+      if (count > 0) {
+        document.title = `(${count}) {{ shop_name }}`;
+      } else {
+        document.title = '{{ shop_name }}';
+      }
+    }
+    updateNewCount();
+
+    function filterOrders(filter) {
+      document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+      document.querySelector(`[data-filter="${filter}"]`).classList.add('active');
+      document.querySelectorAll('.order-card').forEach(card => {
+        if (filter === 'all' || card.dataset.status === filter) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function printOrder(orderId) {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = 'جاري...';
+      fetch(`/worker/print/${orderId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            showToast('تم إرسال الطلب للطباعة', 'success');
+            location.reload();
+          } else {
+            showToast(d.error || 'خطأ في الطباعة', 'danger');
+            btn.disabled = false;
+            btn.textContent = '🖨️ طباعة';
+          }
+        });
+    }
+
+    function markDone(orderId) {
+      fetch(`/worker/done/${orderId}`, { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            showToast('تم تأكيد الإنجاز', 'success');
+            location.reload();
+          }
+        });
+    }
+
+    function openTransferModal(orderId) {
+      document.getElementById('transferOrderId').value = orderId;
+      document.getElementById('transferModal').classList.add('active');
+    }
+
+    function closeTransferModal() {
+      document.getElementById('transferModal').classList.remove('active');
+    }
+
+    function confirmTransfer() {
+      const orderId = document.getElementById('transferOrderId').value;
+      const toComputer = document.getElementById('transferTarget').value;
+      const reason = document.getElementById('transferReason').value;
+      fetch(`/worker/transfer/${orderId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ to_computer: toComputer, reason: reason })
+      }).then(r => r.json()).then(d => {
+        if (d.success) {
+          showToast('تم التحويل بنجاح', 'success');
+          location.reload();
+        } else {
+          showToast(d.error || 'فشل التحويل', 'danger');
+        }
+      });
+      closeTransferModal();
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      document.getElementById('soundToggle').textContent = soundEnabled ? '🔔' : '🔕';
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('ar-DZ');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+</body>
+</html>

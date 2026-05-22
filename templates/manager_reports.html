@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — التقارير</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/workers">👥 العمال</a></li>
+        <li><a href="/manager/reports" class="active">📈 التقارير</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">التقارير والإحصائيات</div>
+        <a href="/manager/reports/export" class="btn btn-accent">📥 تصدير PDF</a>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-value" id="rToday">-</div><div class="stat-label">اليوم</div></div>
+        <div class="stat-card"><div class="stat-value" id="rWeek">-</div><div class="stat-label">هذا الأسبوع</div></div>
+        <div class="stat-card"><div class="stat-value" id="rMonth">-</div><div class="stat-label">هذا الشهر</div></div>
+        <div class="stat-card"><div class="stat-value" id="rRevenue">-</div><div class="stat-label">الإيرادات</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div class="card"><div class="card-header">الطلبات لكل يوم (30 يوم)</div><div class="card-body"><canvas id="ordersChart" height="200"></canvas></div></div>
+        <div class="card"><div class="card-header">الإيرادات لكل يوم (30 يوم)</div><div class="card-body"><canvas id="revenueChart" height="200"></canvas></div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card"><div class="card-header">حسب المحطة</div><div class="card-body"><canvas id="stationChart" height="200"></canvas></div></div>
+        <div class="card"><div class="card-header">أبيض وأسود vs ألوان</div><div class="card-body"><canvas id="colorChart" height="200"></canvas></div></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    fetch('/api/stats/today').then(r=>r.json()).then(d=>{
+      document.getElementById('rToday').textContent = d.orders || 0;
+    });
+
+    document.getElementById('rWeek').textContent = '-';
+    document.getElementById('rMonth').textContent = '-';
+    document.getElementById('rRevenue').textContent = '-';
+
+    const COLORS = {primary:'#6B3F1F', accent:'#F5C518', sec:'#8B5E3C', dark:'#2C1A0E'};
+
+    new Chart(document.getElementById('ordersChart'), {
+      type: 'line',
+      data: {
+        labels: Array.from({length:30},(_,i)=>i+1),
+        datasets: [{label:'الطلبات', data:Array.from({length:30},()=>Math.floor(Math.random()*20+5)), borderColor:COLORS.primary, tension:0.3}]
+      },
+      options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}}
+    });
+
+    new Chart(document.getElementById('revenueChart'), {
+      type: 'bar',
+      data: {
+        labels: Array.from({length:30},(_,i)=>i+1),
+        datasets: [{label:'الإيرادات', data:Array.from({length:30},()=>Math.floor(Math.random()*500+100)), backgroundColor:COLORS.accent}]
+      },
+      options: {responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}}
+    });
+
+    new Chart(document.getElementById('stationChart'), {
+      type: 'pie',
+      data: {
+        labels: ['PC1', 'PC2', 'PC3', 'PC4'],
+        datasets: [{data:[12,19,8,15], backgroundColor:[COLORS.primary, COLORS.accent, COLORS.sec, COLORS.dark]}]
+      },
+      options: {responsive:true, maintainAspectRatio:false}
+    });
+
+    new Chart(document.getElementById('colorChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['أبيض وأسود', 'ألوان'],
+        datasets: [{data:[35, 19], backgroundColor:[COLORS.primary, COLORS.accent]}]
+      },
+      options: {responsive:true, maintainAspectRatio:false}
+    });
+  </script>
+</body>
+</html>

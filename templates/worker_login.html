@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول — {{ config.SHOP_NAME }}</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <style>
+    body {
+      background: linear-gradient(135deg, var(--dark), #1a0f05);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .login-logo img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      margin-bottom: 12px;
+    }
+    .login-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <img src="/static/images/logo.png" alt="Logo" onerror="this.style.display='none'">
+      <div class="login-title">{{ config.SHOP_NAME }}</div>
+      <div style="color:var(--text-light);font-size:0.9rem;">تسجيل الدخول</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div style="background:{{ 'var(--danger)' if category == 'danger' else 'var(--success)' }};color:white;padding:12px;border-radius:var(--radius-sm);margin-bottom:16px;font-weight:600;text-align:center;">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label class="form-label">اسم المستخدم</label>
+        <input type="text" name="username" class="form-input" placeholder="admin" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">كلمة المرور</label>
+        <input type="password" name="password" class="form-input" placeholder="••••••" required autocomplete="current-password">
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" name="remember" id="remember" style="width:18px;height:18px;">
+        <label for="remember" style="font-size:0.9rem;color:var(--text-light);">تذكرني</label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg">دخول</button>
+    </form>
+  </div>
+</body>
+</html>

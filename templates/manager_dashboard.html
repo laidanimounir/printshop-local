@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ shop_name }} — لوحة الإدارة</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body class="worker-theme rtl">
+  <div class="worker-layout">
+    <nav class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-user">{{ current_user.full_name }}</div>
+        <div class="sidebar-station">مدير</div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="/manager/dashboard" class="active">📊 لوحة التحكم</a></li>
+        <li><a href="/manager/workers">👥 العمال</a></li>
+        <li><a href="/manager/reports">📈 التقارير</a></li>
+        <li><a href="/manager/settings">⚙️ الإعدادات</a></li>
+        <li><a href="/worker/logout">🚪 خروج</a></li>
+      </ul>
+    </nav>
+
+    <main class="worker-main">
+      <div class="worker-topbar">
+        <div class="worker-title">لوحة الإدارة — {{ shop_name }}</div>
+      </div>
+
+      <div class="stats-grid" id="todayStats">
+        <div class="stat-card"><div class="stat-value" id="statOrders">-</div><div class="stat-label">طلبات اليوم</div></div>
+        <div class="stat-card"><div class="stat-value" id="statPages">-</div><div class="stat-label">صفحات اليوم</div></div>
+        <div class="stat-card"><div class="stat-value" id="statRevenue">-</div><div class="stat-label">إيرادات اليوم</div></div>
+        <div class="stat-card"><div class="stat-value" id="statWorkers">-</div><div class="stat-label">العمال النشطون</div></div>
+      </div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));">
+        {% for pc_id, info in stats.items() %}
+        <div class="stat-card" style="padding:12px;">
+          <div style="font-weight:700;color:var(--primary);">{{ info.name }}</div>
+          <div style="font-size:0.85rem;color:var(--text-light);">{{ info.new_count }} جديد</div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header">جميع الطلبات</div>
+        <div class="card-body" style="padding:12px;overflow-x:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>رقم الطلب</th>
+                <th>المحطة</th>
+                <th>العميل</th>
+                <th>الملف</th>
+                <th>الحالة</th>
+                <th>السعر</th>
+                <th>التاريخ</th>
+                <th>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for order in orders %}
+              <tr>
+                <td><strong>#{{ order.order_number }}</strong></td>
+                <td>{{ computers.get(order.computer_id, {}).get('name', order.computer_id) }}</td>
+                <td>{{ order.customer_phone }}</td>
+                <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ order.file_name }}</td>
+                <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
+                <td>{{ order.price or '-' }}</td>
+                <td>{{ order.created_at.strftime('%H:%M %d/%m') if order.created_at else '' }}</td>
+                <td>
+                  {% if order.status == 'new' %}
+                  <form method="POST" action="/worker/print/{{ order.id }}" style="display:inline;">
+                    <button class="btn btn-success btn-sm">🖨️</button>
+                  </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    fetch('/api/stats/today').then(r=>r.json()).then(d=>{
+      document.getElementById('statOrders').textContent = d.orders || 0;
+      document.getElementById('statPages').textContent = d.pages || 0;
+      document.getElementById('statRevenue').textContent = (d.revenue || 0) + ' د.ج';
+    });
+    document.getElementById('statWorkers').textContent = {{ workers|length }};
+  </script>
+</body>
+</html>

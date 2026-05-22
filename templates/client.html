@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6B3F1F">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/images/icon_192.png">
+  <title>{% if shop_name %}{{ shop_name }}{% else %}PrintShop{% endif %} — إرسال طباعة</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="customer-theme rtl">
+  <div class="customer-header">
+    <img src="/static/images/logo.png" alt="{{ shop_name }}" class="customer-logo" onerror="this.style.display='none'">
+    <div class="customer-shop-name">{{ shop_name }}</div>
+    <div class="customer-slogan">{{ shop_slogan }}</div>
+  </div>
+
+  <form class="customer-form" id="uploadForm" action="/submit/{{ computer_id }}" method="POST" enctype="multipart/form-data">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="toast toast-{{ category }}" style="position:static;margin-bottom:12px;animation:none;color:white;">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="form-group">
+      <div class="file-upload-zone" id="fileZone" onclick="document.getElementById('fileInput').click()">
+        <div class="file-upload-zone-icon">📄</div>
+        <div class="file-upload-zone-text">اضغط لاختيار ملف</div>
+        <div style="font-size:0.8rem;color:var(--text-light);margin-top:4px;">PDF, JPG, PNG, DOCX, XLSX</div>
+      </div>
+      <input type="file" name="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.docx,.xlsx,.pptx" style="display:none" required>
+      <div class="file-preview" id="filePreview">
+        <img id="previewImage" src="" alt="Preview">
+        <div class="file-preview-info">
+          <div class="file-preview-name" id="fileName">-</div>
+          <div class="file-preview-size" id="fileSize">-</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">عدد النسخ</label>
+      <div class="counter-group">
+        <button type="button" class="counter-btn" onclick="changeCopies(-1)">−</button>
+        <span class="counter-value" id="copiesDisplay">1</span>
+        <button type="button" class="counter-btn" onclick="changeCopies(1)">+</button>
+      </div>
+      <input type="hidden" name="copies" id="copiesInput" value="1">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">نوع الطباعة</label>
+      <div class="toggle-group" id="colorToggle">
+        <button type="button" class="toggle-option active" data-value="bw" onclick="setColorMode('bw')">⚫ أبيض وأسود</button>
+        <button type="button" class="toggle-option" data-value="color" onclick="setColorMode('color')">🔴 ألوان</button>
+      </div>
+      <input type="hidden" name="color_mode" id="colorModeInput" value="bw">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">حجم الورق</label>
+      <div class="toggle-group" id="paperToggle">
+        <button type="button" class="toggle-option active" data-value="A4" onclick="setPaperSize('A4')">A4</button>
+        <button type="button" class="toggle-option" data-value="A3" onclick="setPaperSize('A3')">A3</button>
+      </div>
+      <input type="hidden" name="paper_size" id="paperSizeInput" value="A4">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">ملاحظات (اختياري)</label>
+      <textarea name="notes" class="form-textarea" placeholder="أي ملاحظات للطباعة..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">رقم الهاتف <span style="color:var(--danger)">*</span></label>
+      <input type="tel" name="customer_phone" class="form-input" inputmode="numeric" placeholder="05XX XXX XXX" required>
+    </div>
+
+    <div class="price-display" id="priceDisplay">
+      <span id="priceValue">10</span> <small>د.ج</small>
+    </div>
+
+    <button type="submit" class="btn btn-accent btn-lg btn-block" id="submitBtn">
+      إرسال الطلب
+    </button>
+
+    <div style="text-align:center;margin-top:16px;color:var(--text-light);font-size:0.8rem;">
+      {{ pc.name }} — {{ computer_id }}
+    </div>
+  </form>
+
+  <script src="/static/js/main.js"></script>
+  <script>
+    const PRICE_BW = {{ config.PRICE_BW_PER_PAGE }};
+    const PRICE_COLOR = {{ config.PRICE_COLOR_PER_PAGE }};
+    const PRICE_A3_MULT = {{ config.PRICE_A3_MULTIPLIER }};
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById('fileZone').classList.add('has-file');
+        document.getElementById('filePreview').classList.add('active');
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = function(ev) {
+            document.getElementById('previewImage').src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        } else {
+          document.getElementById('previewImage').src = '/static/images/file-icon.png';
+        }
+
+        updatePrice();
+      }
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('submitBtn').textContent = 'جاري الإرسال...';
+    });
+
+    function changeCopies(delta) {
+      const display = document.getElementById('copiesDisplay');
+      const input = document.getElementById('copiesInput');
+      let val = parseInt(display.textContent) + delta;
+      if (val < 1) val = 1;
+      if (val > 100) val = 100;
+      display.textContent = val;
+      input.value = val;
+      updatePrice();
+    }
+
+    function setColorMode(mode) {
+      document.getElementById('colorModeInput').value = mode;
+      document.querySelectorAll('#colorToggle .toggle-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.value === mode);
+      });
+      updatePrice();
+    }
+
+    function setPaperSize(size) {
+      document.getElementById('paperSizeInput').value = size;
+      document.querySelectorAll('#paperToggle .toggle-option').forEach(el => {
+        el.classList.toggle('active', el.dataset.value === size);
+      });
+      updatePrice();
+    }
+
+    function updatePrice() {
+      const copies = parseInt(document.getElementById('copiesDisplay').textContent);
+      const colorMode = document.getElementById('colorModeInput').value;
+      const paperSize = document.getElementById('paperSizeInput').value;
+      const perPage = colorMode === 'color' ? PRICE_COLOR : PRICE_BW;
+      const mult = paperSize === 'A3' ? PRICE_A3_MULT : 1;
+      const total = copies * perPage * mult;
+      document.getElementById('priceValue').textContent = total;
+    }
+  </script>
+</body>
+</html>

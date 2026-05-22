@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6B3F1F">
+  <title>{{ shop_name }} — تأكيد الطلب</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="customer-theme rtl" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px;">
+  <div style="text-align:center;max-width:400px;">
+    <div style="font-size:4rem;color:var(--success);animation:fadeInUp 0.5s ease;">
+      ✅
+    </div>
+    <h1 style="color:var(--primary);margin:16px 0 8px;font-size:1.5rem;">تم استلام طلبك بنجاح!</h1>
+    <p style="color:var(--text-light);margin-bottom:24px;">شكراً لتقديمك طلب الطباعة في <strong>{{ shop_name }}</strong></p>
+
+    <div style="background:white;border-radius:var(--radius);padding:24px;box-shadow:0 4px 20px var(--shadow);margin-bottom:20px;">
+      <div style="font-size:0.9rem;color:var(--text-light);margin-bottom:8px;">رقم طلبك</div>
+      <div style="font-size:3rem;font-weight:900;color:var(--primary);letter-spacing:2px;direction:ltr;" id="orderNumber">{{ order.order_number }}</div>
+    </div>
+
+    <div style="background:var(--gray);border-radius:var(--radius-sm);padding:16px;margin-bottom:24px;text-align:right;">
+      <div style="display:flex;justify-content:space-between;padding:4px 0;">
+        <span style="color:var(--text-light);">الملف</span>
+        <span style="font-weight:600;">{{ order.file_name }}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;">
+        <span style="color:var(--text-light);">النسخ</span>
+        <span style="font-weight:600;">{{ order.copies }}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;">
+        <span style="color:var(--text-light);">النوع</span>
+        <span style="font-weight:600;">{% if order.color_mode == 'color' %}ألوان{% else %}أبيض وأسود{% endif %}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;">
+        <span style="color:var(--text-light);">الورق</span>
+        <span style="font-weight:600;">{{ order.paper_size }}</span>
+      </div>
+      {% if order.price %}
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--border);margin-top:4px;padding-top:8px;">
+        <span style="color:var(--text-light);">السعر</span>
+        <span style="font-weight:800;color:var(--primary);">{{ order.price }} د.ج</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div style="background:var(--accent);color:var(--dark);padding:16px;border-radius:var(--radius-sm);font-weight:700;margin-bottom:24px;">
+      أعطِ هذا الرقم للعامل على {{ pc.get('name', order.computer_id) }}
+    </div>
+
+    <button class="btn btn-primary btn-block" onclick="window.location.href='/upload/{{ order.computer_id }}'">
+      طلب جديد
+    </button>
+  </div>
+
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</body>
+</html>
