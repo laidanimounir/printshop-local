@@ -15,10 +15,10 @@ def test(name, condition, detail=""):
     global passed, failed
     if condition:
         passed += 1
-        print(f"  ✅ PASS: {name}")
+        print(f"  [OK] PASS: {name}")
     else:
         failed += 1
-        print(f"  ❌ FAIL: {name} - {detail}")
+        print(f"  [XX] FAIL: {name} - {detail}")
 
 
 print("=" * 60)
@@ -51,7 +51,7 @@ test("main.js exists", os.path.exists("static/js/main.js"))
 test("worker.js exists", os.path.exists("static/js/worker.js"))
 test("manifest.json exists", os.path.exists("static/manifest.json"))
 test("sw.js exists", os.path.exists("static/sw.js"))
-test("PWA manifest is valid JSON", open("static/manifest.json").read().strip().startswith("{"))
+test("PWA manifest is valid JSON", open("static/manifest.json", encoding='utf-8').read().strip().startswith("{"))
 
 # 2. Config
 print("\n[2] Configuration")
@@ -64,11 +64,9 @@ test("PRICE_COLOR_PER_PAGE > 0", cfg.PRICE_COLOR_PER_PAGE > 0)
 
 # 3. Database
 print("\n[3] Database")
+import server
 from app import app as test_app
-from database import init_db, db, Order, Worker, generate_order_number
-from auth import login_manager
-login_manager.init_app(test_app)
-init_db(test_app)
+from database import db, Order, Worker, generate_order_number
 
 with test_app.app_context():
     test("Database tables created", Order.query is not None)
